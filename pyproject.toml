@@ -1,0 +1,27 @@
+[project]
+package-mode = false
+name = "agentalchemy"
+version = "0.1.0"
+description = "A platform for building and configuring AI Agents using Langgraph"
+authors = [
+    {name = "mauro",email = "m.montenegro.meza@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0.0"
+dependencies = [
+    "langgraph (>=0.4.3,<0.5.0)",
+    "pytest (>=8.3.5,<9.0.0)",
+    "python-dotenv (>=1.1.0,<2.0.0)",
+    "langchain-aws (>=0.2.23,<0.3.0)",
+    "langchain-tavily (>=0.1.6,<0.2.0)",
+    "rich (>=14.0.0,<15.0.0)",
+    "newsapi-python (>=0.2.7,<0.3.0)",
+    "beautifulsoup4 (>=4.13.4,<5.0.0)",
+    "pytest-asyncio (>=0.26.0,<0.27.0)",
+    "fastapi[standard] (>=0.115.12,<0.116.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
