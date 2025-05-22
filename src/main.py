@@ -21,5 +21,5 @@ def init_page():
         Punto de entrada para el backend.
         Determina si el servicio está Online.
     """
-    print("Health Check Ok Test!!!")
-    return {"message":"La plataforma de Agentes SAIP se encuentra operativa."}
+    
+    return {"message":"La plataforma de SAIP se encuentra operativa."}
