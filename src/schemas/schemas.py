@@ -13,6 +13,7 @@ class AgentState(TypedDict):
     potential_articles: Annotated[List[dict[str, str, str]], "Article with full text to consider summarizing."]
     tldr_articles: Annotated[List[dict[str, str, str]], "Selected article TL;DRs."]
     formatted_results: Annotated[str, "Formatted results to display."]
+    report: Annotated[str,"Final State of the art report"]
   
 
 class ScraperAgentState(TypedDict):
@@ -53,6 +54,7 @@ class ArticleAnalysis(BaseModel):
 class AgentResponse(BaseModel):
     header: str
     summaries: List[ArticleSummary]
+    report:str
 
 class ScrapAgentRequest(BaseModel):
     urls:List[HttpUrl]

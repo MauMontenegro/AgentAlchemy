@@ -20,7 +20,8 @@ def create_initial_state(query:str,num_articles:int):
         "num_articles_tldr": num_articles,
         "potential_articles": [],
         "tldr_articles": [],
-        "formatted_results": "No articles with text found.",       
+        "formatted_results": "No articles with text found.", 
+        "report":"",      
     }
     return state
 
@@ -30,4 +31,11 @@ async def agent_call(request:AgentRequest):
     state = create_initial_state(request.query,request.articles)
     final_state = await agent.graph.ainvoke(state)
 
+    if not final_state.get("tldr_articles"):
+        return AgentResponse(
+            header="No articles found",
+            summaries=[],
+            report="No state of the art"
+        )
+    
     return final_state["formatted_results"]

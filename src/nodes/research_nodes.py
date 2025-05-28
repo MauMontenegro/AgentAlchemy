@@ -259,9 +259,49 @@ def extract_topics_bias(state:AgentState)->AgentState:
         tldr_articles[i]["bias_explanation"] = result["bias_explanation"]
     
     state["tldr_articles"] = tldr_articles
+    
+    return state
 
-    print("New function testing")
-    print(tldr_articles)
+def state_of_art(state:AgentState)->AgentState:
+    """Make a State of the art based on the topic and reviewed news"""
+
+    tldr_articles = state["tldr_articles"]
+    model = os.getenv("REASONING_MODEL")
+    llm = ChatBedrockConverse(model=model,temperature=0)   
+
+    bloque_articulos =""
+
+    for i, art in enumerate(tldr_articles, 1):
+        bloque_articulos += f"""Artículo {i}:
+        Título: {art['title']}
+        Tendencia política: {art['bias']}
+        Contenido: {art['text']}
+        ---
+        """
+
+    prompt = f"""
+    Eres un analista experto en medios de comunicación y actualidad global. Tu tarea es redactar un informe de contexto basado en un conjunto de noticias que tratan sobre un tema específico.
+
+    Recibirás un conjunto de noticias relevantes que abordan distintas perspectivas y hechos recientes relacionados con el tema en cuestión. A partir de estas noticias, deberás redactar un informe completo y objetivo que incluya:
+
+    1. **Panorama Actual**: Describe el estado actual del tema, incluyendo hechos clave, eventos recientes, actores involucrados, y opiniones predominantes.
+
+    2. **Tendencias o posibles escenarios futuros**: Menciona las tendencias que se vislumbran, predicciones basadas en el comportamiento reciente, posibles cambios sociales, económicos, políticos o tecnológicos relacionados con el tema.
+
+    3. **Debates, controversias o polarización**: Si hay posturas encontradas, políticas enfrentadas o conflictos en la narrativa, describe las posiciones principales.
+
+    4. **Conclusión final**: Resume el estado general del tema, su importancia y las posibles implicancias a futuro.
+
+    Debes redactar con un tono periodístico, profesional y accesible para un lector general. No repitas el contenido textual de las noticias, sino sintetiza y analiza la información.
+
+    Noticias:
+    {bloque_articulos}
+
+    """
+    result = llm.invoke(prompt).content
+
+    state["report"] = result
+    
     return state
 
 def format_results(state: AgentState) -> AgentState:
@@ -291,6 +331,7 @@ def format_results(state: AgentState) -> AgentState:
     state["formatted_results"] = {
         "header": f"Top {len(tldr_articles)} articulo(s) encontrados para los siguientes términos de búsqueda: {', '.join(past_queries)}",
         "summaries": formatted_summaries,
+        "report":state["report"]
     }
 
     return state

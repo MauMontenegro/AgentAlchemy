@@ -10,7 +10,9 @@ app.include_router(scrap_agent_router,prefix="/scrapagent",tags=["Agents"])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://agent-alchemy-front.vercel.app"],
+    allow_origins=["https://agent-alchemy-front.vercel.app","http://localhost",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -23,3 +25,7 @@ def init_page():
     """
     
     return {"message":"La plataforma de SAIP se encuentra operativa."}
+
+@app.get("/health")
+def health_check():
+    return {"message":"Agente Operativo"}

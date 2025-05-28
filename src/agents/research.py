@@ -8,7 +8,8 @@ from src.nodes.research_nodes import (
     summarize_articles_parallel,
     format_results,
     articles_text_decision,
-    extract_topics_bias
+    extract_topics_bias,
+    state_of_art
 )
 
 class ResearchAgent():
@@ -28,6 +29,7 @@ class ResearchAgent():
         workflow.add_node("summarize",summarize_articles_parallel)
         workflow.add_node("format",format_results)
         workflow.add_node("analysis",extract_topics_bias)
+        workflow.add_node("stateofart",state_of_art)
         
         # Flow of the graph       
         workflow.add_edge(START,"generate_params")
@@ -44,7 +46,8 @@ class ResearchAgent():
         )
         workflow.add_edge("top_urls","summarize")
         workflow.add_edge("summarize","analysis")
-        workflow.add_edge("analysis","format")
+        workflow.add_edge("analysis","stateofart")
+        workflow.add_edge("stateofart","format")
         workflow.add_edge("format",END)
 
         return workflow.compile()
