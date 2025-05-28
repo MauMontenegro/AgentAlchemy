@@ -20,7 +20,7 @@ def create_initial_state(query:str,num_articles:int):
         "num_articles_tldr": num_articles,
         "potential_articles": [],
         "tldr_articles": [],
-        "formatted_results": "No articles with text found."
+        "formatted_results": "No articles with text found.",       
     }
     return state
 

@@ -1,16 +1,9 @@
 import os
 import requests
-import re
-
 from dotenv import load_dotenv
-from datetime import datetime
-
 from bs4 import BeautifulSoup
-
 from langchain_aws import ChatBedrockConverse
-from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
-
 from src.schemas.schemas import ScraperAgentState
 
 load_dotenv()
@@ -82,10 +75,7 @@ def summarize_article(state:ScraperAgentState)->ScraperAgentState:
     - [Punto importante 2]
     - ...
 
-    ## Resumen
-    [Resumen del artículo en un párrafo o dos]
-
-    ### Opinión Crítica
+    ## Opinión Crítica
     [Evaluación crítica del artículo con observaciones claras, argumentadas y bien redactadas]
 
     Título del Artículo: {title}

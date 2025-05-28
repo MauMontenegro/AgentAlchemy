@@ -1,17 +1,19 @@
 import os
-import requests
 import re
+from datetime import datetime
+import requests
+
+from dateutil import parser
 
 from dotenv import load_dotenv
-from datetime import datetime
 
 from bs4 import BeautifulSoup
-
+from newsapi import NewsApiClient
 from langchain_aws import ChatBedrockConverse
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from src.schemas.schemas import AgentState,NewsApiParams
+from src.schemas.schemas import AgentState,NewsApiParams,ArticleAnalysis
 
 load_dotenv()
 
@@ -23,7 +25,7 @@ def generate_newsapi_params(state: AgentState) -> AgentState:
     llm = ChatBedrockConverse(model=model,temperature=0)    
 
     # Define the structure of the LLM output
-    parser = JsonOutputParser(pydantic_object=NewsApiParams)
+    newsapi_parser = JsonOutputParser(pydantic_object=NewsApiParams)
 
     today_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -52,15 +54,15 @@ def generate_newsapi_params(state: AgentState) -> AgentState:
     If this is your last search, use all news sources and a 30 days search range.
     """
 
-    # Create a prompt template the create the newsapi parameters
+    # Create a prompt template to create the newsapi parameters
     prompt_template = PromptTemplate(
         template=template,
         variables={"today":today_date,"query":news_query,"past_searches":past_searches,"num_searches_remaining":num_searches_remaining},
-        partial_variables={"format_instructions":parser.get_format_instructions()}
+        partial_variables={"format_instructions":newsapi_parser.get_format_instructions()}
     )
 
     # Create the prompt chain
-    chain = prompt_template | llm | parser
+    chain = prompt_template | llm | newsapi_parser
 
     result = chain.invoke({"query": news_query, "today_date": today_date, "past_searches": past_searches, "num_searches_remaining": num_searches_remaining})
 
@@ -69,7 +71,7 @@ def generate_newsapi_params(state: AgentState) -> AgentState:
 
     return state
 
-from newsapi import NewsApiClient
+
 
 def retrieve_articles_metadata(state:AgentState)->AgentState:
     """Use the NewsApi parameters to make the API call"""
@@ -82,15 +84,15 @@ def retrieve_articles_metadata(state:AgentState)->AgentState:
         newsapi = NewsApiClient(api_key=os.getenv("NEWSAPI_API_KEY"))
 
         articles = newsapi.get_everything(**newsapi_params)
-
+        
         state["past_searches"].append(newsapi_params)
 
         scraped_urls = state["scraped_urls"]
 
         new_articles = []
         for article in articles["articles"]:
-            if article["url"] not in scraped_urls and len(state["potential_articles"]) + len(new_articles)<10:
-                new_articles.append(article)
+            if article["url"] not in scraped_urls and len(state["potential_articles"]) + len(new_articles) <= state["num_articles_tldr"]:
+                new_articles.append(article)               
 
         state["articles_metadata"] = new_articles
 
@@ -108,15 +110,14 @@ def retrieve_articles_text(state:AgentState) -> AgentState:
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'
     }
 
-    # create list to store valid article dicts
     potential_articles = []
 
-    # iterate over the urls
-    for article in articles_metadata:
-        # extract the url
+    for article in articles_metadata:        
         url = article['url']
+        date = article['publishedAt']
 
         # use beautiful soup to extract the article content
+        # TODO: Agregar un exception si la request no se realizó exitosamente
         response = requests.get(url, headers=headers,timeout=60)
         
         # check if the request was successful
@@ -128,7 +129,7 @@ def retrieve_articles_text(state:AgentState) -> AgentState:
             text = soup.get_text(strip=True)
 
             # append article dict to list
-            potential_articles.append({"title": article["title"], "url": url, "description": article["description"], "text": text})
+            potential_articles.append({"title": article["title"], "url": url, "description": article["description"], "text": text,"date":date})
 
             # append the url to the processed urls
             state["scraped_urls"].append(url)
@@ -139,13 +140,14 @@ def retrieve_articles_text(state:AgentState) -> AgentState:
     return state
 
 def select_top_urls(state:AgentState) -> AgentState:
-    """based on article texts, choose the top-k articles to summarize"""
+    """Based on article texts, choose the top-k articles to summarize"""
 
     # Instantiate LLM model
     model = os.getenv("REASONING_MODEL")    
     llm = ChatBedrockConverse(model=model,temperature=0)   
 
     news_query = state["news_query"]
+
     num_articles_tldr = state["num_articles_tldr"]
 
     potential_articles = state["potential_articles"]
@@ -163,11 +165,12 @@ def select_top_urls(state:AgentState) -> AgentState:
 
     result = llm.invoke(prompt).content
 
+    # TODO: Mejorar pattern matching con librerias
     url_pattern = r'(https?://[^\s",]+)'
 
     urls = re.findall(url_pattern, result)
 
-    tldr_articles = [article for article in potential_articles if article['url'] in urls]
+    tldr_articles = [article for article in potential_articles if article['url'] in urls]   
 
     state["tldr_articles"] = tldr_articles
 
@@ -176,15 +179,13 @@ def select_top_urls(state:AgentState) -> AgentState:
 def summarize_articles_parallel(state:AgentState)-> AgentState:
     """Summarize the articles based on full text in parallel."""
     tldr_articles = state["tldr_articles"]
-
     model = os.getenv("REASONING_MODEL")    
-    llm = ChatBedrockConverse(model=model,temperature=0)   
-
+    llm = ChatBedrockConverse(model=model,temperature=0)
     prompt = """
     Create a * bulleted summarizing tldr for the article:
     {text}
-      
-    Be sure to follow the following format exactly with nothing else:
+
+    Follow this exact format:
     {title}
     {url}
     * tl;dr bulleted summary
@@ -192,16 +193,75 @@ def summarize_articles_parallel(state:AgentState)-> AgentState:
     """
 
     # iterate over the selected articles and collect summaries synchronously
-    for i in range(len(tldr_articles)):
+    for i,_ in enumerate(tldr_articles):
         text = tldr_articles[i]["text"]
         title = tldr_articles[i]["title"]
         url = tldr_articles[i]["url"]
+        
         # invoke the llm synchronously
         result = llm.invoke(prompt.format(title=title, url=url, text=text))
         tldr_articles[i]["summary"] = result.content
 
     state["tldr_articles"] = tldr_articles
 
+    return state
+
+def extract_topics_bias(state:AgentState)->AgentState:
+    """Extract the main topics of the news and political bias."""
+
+    tldr_articles = state["tldr_articles"]
+    model = os.getenv("REASONING_MODEL")
+    llm = ChatBedrockConverse(model=model,temperature=0)    
+    analysis_parser = JsonOutputParser(pydantic_object=ArticleAnalysis)
+
+    template = """
+    You are a political media analysis assistant. Your task is to analyze the following news article to:
+
+    1. Identify the main topics or entities discussed.
+    2. Detect if the article presents any political bias.
+    3. Explain the reasoning behind the detected bias.
+    4. Determine if the article is written as humor, parody, or satire.
+
+    ### Use the following checklist to detect bias:
+    - Is the article heavily opinionated or one-sided?
+    - Does it rely on unsupported or unsubstantiated claims?
+    - Does it present cherry-picked facts that support only one outcome?
+    - Does it disguise opinions as facts?
+    - Does it use extreme or emotionally charged language?
+    - Does it attempt to persuade without factual evidence?
+    - Is the author anonymous or lacks subject-matter expertise?
+    - Is the article written as humor, parody, or satire?
+    - Is it promotional in disguise?
+
+    If the article is clearly written as humor, parody, or satire, classify the bias as `"humor"`.
+
+    You must return a param dict object with the following formatting:
+    {format_instructions}
+
+    News Article:
+    {text}
+
+    """
+    # iterate over the selected articles and extract topics and bias
+    for i,_ in enumerate(tldr_articles):
+      
+        prompt_template = PromptTemplate(
+        template=template,
+        variables={"text":tldr_articles[i]["text"]},
+        partial_variables={"format_instructions":analysis_parser.get_format_instructions()}
+        )
+
+        chain = prompt_template | llm | analysis_parser
+        
+        result = chain.invoke({"text":tldr_articles[i]["text"]})
+        tldr_articles[i]["topics"] = result["topics"]
+        tldr_articles[i]["bias"] = result["bias"]
+        tldr_articles[i]["bias_explanation"] = result["bias_explanation"]
+    
+    state["tldr_articles"] = tldr_articles
+
+    print("New function testing")
+    print(tldr_articles)
     return state
 
 def format_results(state: AgentState) -> AgentState:
@@ -215,17 +275,22 @@ def format_results(state: AgentState) -> AgentState:
         lines = article["summary"].strip().split("\n")
         title = lines[0]
         url = lines[1]
+        date = article.get('date','missing')
         bullets = [line.strip("* ").strip() for line in lines[2:] if line.startswith("*")]
 
         formatted_summaries.append({
             "title": title,
             "url": url,
-            "bullets": bullets
+            "bullets": bullets,
+            "date": parser.parse(date),
+            "topics":article.get('topics'),
+            "bias": article.get('bias'),
+            "bias_explanation":article.get('bias_explanation'),
         })
 
     state["formatted_results"] = {
         "header": f"Top {len(tldr_articles)} articulo(s) encontrados para los siguientes términos de búsqueda: {', '.join(past_queries)}",
-        "summaries": formatted_summaries
+        "summaries": formatted_summaries,
     }
 
     return state
