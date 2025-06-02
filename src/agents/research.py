@@ -1,7 +1,7 @@
 from langgraph.graph import START,END,StateGraph
 from src.schemas.schemas import AgentState
 from src.nodes.research_nodes import (
-    generate_newsapi_params,
+    generate_rss_feed_url,    
     retrieve_articles_metadata,
     retrieve_articles_text,
     select_top_urls,
@@ -22,7 +22,8 @@ class ResearchAgent():
         workflow= StateGraph(self.state)        
 
         # Add Nodes to Graph
-        workflow.add_node("generate_params",generate_newsapi_params)
+        #workflow.add_node("generate_params",generate_newsapi_params)
+        workflow.add_node("generate_params",generate_rss_feed_url)
         workflow.add_node("fetch_metadata",retrieve_articles_metadata)
         workflow.add_node("articles_text",retrieve_articles_text)
         workflow.add_node("top_urls",select_top_urls)

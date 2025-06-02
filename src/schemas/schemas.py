@@ -1,15 +1,20 @@
-from typing import TypedDict,Annotated,List,Literal
+from typing import TypedDict,Annotated,List,Literal,Optional
 from pydantic import BaseModel,Field,HttpUrl
 from datetime import datetime
 
 class AgentState(TypedDict):
     news_query: Annotated[str, "Input query to extract news search parameters from."]
+    languages: Annotated[List[str],"News languages"]
+    countries:Annotated[List[str],"News Countries"]
+    sources: Annotated[List[str],"News Sources"]
+    num_articles_tldr: Annotated[int, "Number of articles to create TL;DR for."]
+    urls: Annotated[List[str],"Urls to scrap."]
+
     num_searches_remaining: Annotated[int, "Number of articles to search for."]
     newsapi_params: Annotated[dict, "Structured argument for the News API."]
     past_searches: Annotated[List[dict], "List of search params already used."]
     articles_metadata: Annotated[list[dict], "Article metadata response from the News API"]
-    scraped_urls: Annotated[List[str], "List of urls already scraped."]
-    num_articles_tldr: Annotated[int, "Number of articles to create TL;DR for."]
+    scraped_urls: Annotated[List[str], "List of urls already scraped."]    
     potential_articles: Annotated[List[dict[str, str, str]], "Article with full text to consider summarizing."]
     tldr_articles: Annotated[List[dict[str, str, str]], "Selected article TL;DRs."]
     formatted_results: Annotated[str, "Formatted results to display."]
@@ -32,10 +37,14 @@ class NewsApiParams(BaseModel):
     sort_by: str = Field(description="sort by 'relevancy', 'popularity', or 'publishedAt', by default is 'publishedAt'")
 
 class AgentRequest(BaseModel):
+    # Required Fields
     query : str = Field(description="User query to search for news")
-    agent_type: str = Field(description="Type of agent selected for task")
-    model:str = Field(description="Selected model to use as LLM")
     articles:int = Field(description="Number of articles to summarize",gt=0,le=10)
+
+    # Optional fields
+    source: Optional[List[str]] = Field(None, description="Specific news source domain (e.g. 'bbc.com')")
+    language: Optional[List[str]] = Field(None, description="Language code for news filtering (e.g. 'es', 'en')")
+    country: Optional[List[str]] = Field(None, description="Country code for news filtering (e.g. 'VE', 'US')")
 
 class ArticleSummary(BaseModel):
     title: str

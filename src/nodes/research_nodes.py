@@ -7,99 +7,77 @@ from dateutil import parser
 
 from dotenv import load_dotenv
 
+import feedparser
+from urllib.parse import quote_plus
+from googlenewsdecoder import gnewsdecoder
+
 from bs4 import BeautifulSoup
-from newsapi import NewsApiClient
+
 from langchain_aws import ChatBedrockConverse
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from src.schemas.schemas import AgentState,NewsApiParams,ArticleAnalysis
+from src.schemas.schemas import AgentState,ArticleAnalysis
 
 load_dotenv()
 
-def generate_newsapi_params(state: AgentState) -> AgentState:
-    """Generate Newsapi parameters based on the query string"""
+def generate_rss_feed_url(state: AgentState)->AgentState:
+    # Search Query Parameters
+    query = state["news_query"]
+    language= state["languages"]
+    country = state["countries"]
+    sources = state["sources"]
 
-    # Instantiate LLM model
-    model = os.getenv("REASONING_MODEL")
-    llm = ChatBedrockConverse(model=model,temperature=0)    
-
-    # Define the structure of the LLM output
-    newsapi_parser = JsonOutputParser(pydantic_object=NewsApiParams)
-
-    today_date = datetime.now().strftime("%Y-%m-%d")
-
-    # Retrieve the list of past search params
-    past_searches = state["past_searches"]
-
-    # Retrieve the number of searches remaining
-    num_searches_remaining = state["num_searches_remaining"]
-
-    # Retrieve the users query
-    news_query = state["news_query"]
-
-    template = """
-    Today is {today_date}.
-
-    Create a param dict for the News API based on the user query:
-    {query}
-
-    These searches have already been made. Loosen the search terms to get more results.
-    {past_searches}
-    
-    Following these formatting instructions:
-    {format_instructions}
-
-    Including this one, you have {num_searches_remaining} searches remaining.
-    If this is your last search, use all news sources and a 30 days search range.
-    """
-
-    # Create a prompt template to create the newsapi parameters
-    prompt_template = PromptTemplate(
-        template=template,
-        variables={"today":today_date,"query":news_query,"past_searches":past_searches,"num_searches_remaining":num_searches_remaining},
-        partial_variables={"format_instructions":newsapi_parser.get_format_instructions()}
-    )
-
-    # Create the prompt chain
-    chain = prompt_template | llm | newsapi_parser
-
-    result = chain.invoke({"query": news_query, "today_date": today_date, "past_searches": past_searches, "num_searches_remaining": num_searches_remaining})
-
-    # update the state
-    state["newsapi_params"] = result
-
+    # Build URLs by source
+    urls_by_source = []    
+    if len(sources)>0:        
+        for source in sources:
+            query_with_source = f' site:{source}'
+            encoded_query = quote_plus(query_with_source)
+            url = f"https://news.google.com/rss/search?q={encoded_query}&gl={country[0]}&ceid={country[0]}:{language[0]}"
+            urls_by_source.append(url)
+    elif len(sources)==0:            
+        encoded_query = quote_plus(query)
+        url = f"https://news.google.com/rss/search?q={encoded_query}&gl={country[0]}&ceid={country[0]}:{language[0]}"
+        urls_by_source.append(url)   
+   
+    state["urls"] = urls_by_source  
+    print(urls_by_source)
     return state
 
+def clean_description(raw_html):
+    cleanr = re.compile('<.*?>')
+    cleantext = re.sub(cleanr, '', raw_html)
+    return cleantext
 
+def retrieve_articles_metadata(state:AgentState)-> AgentState:
+    """Retrieve metadata for each url feed created"""
 
-def retrieve_articles_metadata(state:AgentState)->AgentState:
-    """Use the NewsApi parameters to make the API call"""
+    urls = state["urls"]
+    max_feed_articles = 10
 
-    newsapi_params = state["newsapi_params"]
-    state['num_searches_remaining'] -=1
-
-    try:
-        # Create Newsapi client object
-        newsapi = NewsApiClient(api_key=os.getenv("NEWSAPI_API_KEY"))
-
-        articles = newsapi.get_everything(**newsapi_params)
-        
-        state["past_searches"].append(newsapi_params)
-
-        scraped_urls = state["scraped_urls"]
-
-        new_articles = []
-        for article in articles["articles"]:
-            if article["url"] not in scraped_urls and len(state["potential_articles"]) + len(new_articles) <= state["num_articles_tldr"]:
-                new_articles.append(article)               
-
-        state["articles_metadata"] = new_articles
-
-    except Exception as e:
-        print(f"Error: {e}")
+    articles = []
+    # Traverse trough different feeds    
+    for url in urls:      
+        feed = feedparser.parse(url)        
+        for entry in feed.entries[:max_feed_articles]:
+            if entry.link in state["past_searches"]:
+                continue
+            state["past_searches"].append(entry.link)
+            
+            metadata = {
+                "title": entry.get("title", ""),
+                "link": entry.get("link", ""),
+                "pubDate": datetime(*entry.published_parsed[:6]).isoformat() if entry.get("published_parsed") else "",
+                "description": clean_description(entry.get("description", ""))
+            }    
+            print(metadata["description"])       
+            articles.append(metadata)
+   
+    state["articles_metadata"] = articles   
     
     return state
+
 
 def retrieve_articles_text(state:AgentState) -> AgentState:
     """Scrapper to retrieve article text"""
@@ -110,38 +88,41 @@ def retrieve_articles_text(state:AgentState) -> AgentState:
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'
     }
 
-    potential_articles = []
+    potential_articles = []    
+    for i, article in enumerate(articles_metadata):           
+        url = article['link']
+        date = article['pubDate']        
+        # use beautiful soup to extract the article content        
+        try:
+            real_url = gnewsdecoder(url)
+            
+            response = requests.get(real_url["decoded_url"], headers=headers, timeout=15)            
+            # check if the request was successful
+            if response.status_code == 200:
+                # parse the HTML content
+                soup = BeautifulSoup(response.content, 'html.parser')
 
-    for article in articles_metadata:        
-        url = article['url']
-        date = article['publishedAt']
+                # find the article content
+                text = soup.get_text(strip=True)               
 
-        # use beautiful soup to extract the article content
-        # TODO: Agregar un exception si la request no se realizó exitosamente
-        response = requests.get(url, headers=headers,timeout=60)
-        
-        # check if the request was successful
-        if response.status_code == 200:
-            # parse the HTML content
-            soup = BeautifulSoup(response.content, 'html.parser')
+                # append article dict to list
+                potential_articles.append({"title": article["title"], "url": real_url["decoded_url"], "description": article["description"], "text": text,"date":date})
 
-            # find the article content
-            text = soup.get_text(strip=True)
-
-            # append article dict to list
-            potential_articles.append({"title": article["title"], "url": url, "description": article["description"], "text": text,"date":date})
-
-            # append the url to the processed urls
-            state["scraped_urls"].append(url)
-
-    # append the processed articles to the state
-    state["potential_articles"].extend(potential_articles)
+                # append the url to the processed urls
+                state["scraped_urls"].append(real_url["decoded_url"])
+                
+        except Exception as e:
+            print(f"Error fetching {url}: {e}")
+    
+    # Append the processed articles to the state
+    state["potential_articles"].extend(potential_articles)  
 
     return state
 
+
 def select_top_urls(state:AgentState) -> AgentState:
     """Based on article texts, choose the top-k articles to summarize"""
-
+    print("Selecting Top Urls")
     # Instantiate LLM model
     model = os.getenv("REASONING_MODEL")    
     llm = ChatBedrockConverse(model=model,temperature=0)   
@@ -153,6 +134,7 @@ def select_top_urls(state:AgentState) -> AgentState:
     potential_articles = state["potential_articles"]
 
     formatted_metadata = "\n".join([f"{article['url']}\n{article['description']}\n" for article in potential_articles])
+    print(formatted_metadata)
 
     prompt = f"""
     Based on the user news query:
@@ -164,7 +146,7 @@ def select_top_urls(state:AgentState) -> AgentState:
     """
 
     result = llm.invoke(prompt).content
-
+    print(result)
     # TODO: Mejorar pattern matching con librerias
     url_pattern = r'(https?://[^\s",]+)'
 
@@ -172,7 +154,9 @@ def select_top_urls(state:AgentState) -> AgentState:
 
     tldr_articles = [article for article in potential_articles if article['url'] in urls]   
 
-    state["tldr_articles"] = tldr_articles
+    print(urls)
+
+    state["tldr_articles"] = tldr_articles   
 
     return state
 
@@ -182,7 +166,7 @@ def summarize_articles_parallel(state:AgentState)-> AgentState:
     model = os.getenv("REASONING_MODEL")    
     llm = ChatBedrockConverse(model=model,temperature=0)
     prompt = """
-    Create a * bulleted summarizing tldr for the article:
+    Create a * bulleted summarizing tldr for the article in spanish:
     {text}
 
     Follow this exact format:
@@ -266,6 +250,7 @@ def state_of_art(state:AgentState)->AgentState:
     """Make a State of the art based on the topic and reviewed news"""
 
     tldr_articles = state["tldr_articles"]
+    query = state["news_query"]
     model = os.getenv("REASONING_MODEL")
     llm = ChatBedrockConverse(model=model,temperature=0)   
 
@@ -280,7 +265,10 @@ def state_of_art(state:AgentState)->AgentState:
         """
 
     prompt = f"""
-    Eres un analista experto en medios de comunicación y actualidad global. Tu tarea es redactar un informe de contexto basado en un conjunto de noticias que tratan sobre un tema específico.
+    Eres un analista experto en medios de comunicación y actualidad global. Tu tarea es redactar un informe de contexto en idioma español,basado en un conjunto de noticias recuperados de la web al buscar la siguiente consulta.
+
+    Consulta:
+    {query}
 
     Recibirás un conjunto de noticias relevantes que abordan distintas perspectivas y hechos recientes relacionados con el tema en cuestión. A partir de estas noticias, deberás redactar un informe completo y objetivo que incluya:
 
@@ -292,7 +280,8 @@ def state_of_art(state:AgentState)->AgentState:
 
     4. **Conclusión final**: Resume el estado general del tema, su importancia y las posibles implicancias a futuro.
 
-    Debes redactar con un tono periodístico, profesional y accesible para un lector general. No repitas el contenido textual de las noticias, sino sintetiza y analiza la información.
+    Debes redactar con un tono periodístico, profesional y accesible para un lector general. No repitas el contenido textual de las noticias, sino sintetiza y analiza la información.Incluye siempre
+    información de cada artículo. Además brinda las referencias necesarias de los artículos de donde tomes la información utilizando el número del artículo encerrado entre corchetes. Dame el informe en formato Markdown.
 
     Noticias:
     {bloque_articulos}
@@ -307,7 +296,7 @@ def state_of_art(state:AgentState)->AgentState:
 def format_results(state: AgentState) -> AgentState:
     """Format the results for display."""
     # load a list of past search queries
-    past_queries = [newsapi["q"] for newsapi in state["past_searches"]]
+    past_queries = state["news_query"]
     tldr_articles = state["tldr_articles"]
 
     formatted_summaries = []
@@ -329,7 +318,7 @@ def format_results(state: AgentState) -> AgentState:
         })
 
     state["formatted_results"] = {
-        "header": f"Top {len(tldr_articles)} articulo(s) encontrados para los siguientes términos de búsqueda: {', '.join(past_queries)}",
+        "header": f"Top {len(tldr_articles)} articulo(s) encontrados para los siguientes términos de búsqueda: {(past_queries)}",
         "summaries": formatted_summaries,
         "report":state["report"]
     }
