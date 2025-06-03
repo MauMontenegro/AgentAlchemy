@@ -4,7 +4,7 @@ from src.agents.research import ResearchAgent
 
 router= APIRouter()
 
-def create_initial_state(query:str,num_articles:int,source:list[str]=None,country:list[str]=[""],language:list[str]=[""]):
+def create_initial_state(query:str,num_articles:int,source:list[str]=None,country:list[str]=[""],language:list[str]=[""],mode:str="simple"):
     """
     Generates an initial state
     """    
@@ -26,14 +26,15 @@ def create_initial_state(query:str,num_articles:int,source:list[str]=None,countr
         "potential_articles": [],
         "tldr_articles": [],
         "formatted_results": "No articles with text found.", 
-        "report":"",      
+        "report":"",
+        "mode": mode      
     }
     return state
 
 @router.post("/agent",response_model=AgentResponse)
 async def agent_call(request:AgentRequest):
     agent = ResearchAgent()
-    state = create_initial_state(request.query,request.articles,request.source,request.country,request.language)
+    state = create_initial_state(request.query,request.articles,request.source,request.country,request.language,request.mode)
     final_state = await agent.graph.ainvoke(state)
 
     if not final_state.get("tldr_articles"):

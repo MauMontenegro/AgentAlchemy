@@ -19,6 +19,7 @@ class AgentState(TypedDict):
     tldr_articles: Annotated[List[dict[str, str, str]], "Selected article TL;DRs."]
     formatted_results: Annotated[str, "Formatted results to display."]
     report: Annotated[str,"Final State of the art report"]
+    mode :Annotated[str,"Agent Mode:simple or advanced"]
   
 
 class ScraperAgentState(TypedDict):
@@ -40,6 +41,9 @@ class AgentRequest(BaseModel):
     # Required Fields
     query : str = Field(description="User query to search for news")
     articles:int = Field(description="Number of articles to summarize",gt=0,le=10)
+
+    # Agent Mode
+    mode:str=Field(description="News agent mode")
 
     # Optional fields
     source: Optional[List[str]] = Field(None, description="Specific news source domain (e.g. 'bbc.com')")
