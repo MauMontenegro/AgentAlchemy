@@ -252,7 +252,7 @@ def state_of_art(state:AgentState)->AgentState:
     tldr_articles = state["tldr_articles"]
     query = state["news_query"]
 
-    if state["mode"]=="simple":
+    if state["mode"]=="advanced":
         model = os.getenv("REASONING_MODEL")
         llm = ChatBedrockConverse(model=model,temperature=0)   
 
