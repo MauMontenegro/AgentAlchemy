@@ -2,13 +2,15 @@ import os
 import re
 from datetime import datetime
 import requests
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import quote_plus
 
 from dateutil import parser
 
 from dotenv import load_dotenv
 
 import feedparser
-from urllib.parse import quote_plus
+
 from googlenewsdecoder import gnewsdecoder
 
 from bs4 import BeautifulSoup
@@ -22,27 +24,28 @@ from src.schemas.schemas import AgentState,ArticleAnalysis
 load_dotenv()
 
 def generate_rss_feed_url(state: AgentState)->AgentState:
-    # Search Query Parameters
-    query = state["news_query"]
-    language= state["languages"]
+    """Generate RSS feed URLs based on the user's query and source preferences."""
+    
+    query = state["news_query"]   
     country = state["countries"]
     sources = state["sources"]
 
-    # Build URLs by source
+    base_url = "https://news.google.com/rss/search?q={query}&gl={country}&ceid={country}:es"
+    
+    # Generate the RSS feed URL
     urls_by_source = []    
-    if len(sources)>0:        
+    if sources:        
         for source in sources:
             query_with_source = f' site:{source}'
             encoded_query = quote_plus(query_with_source)
-            url = f"https://news.google.com/rss/search?q={encoded_query}&gl={country[0]}&ceid={country[0]}:{language[0]}"
+            url = base_url.format(query=encoded_query,country=country[0])
             urls_by_source.append(url)
-    elif len(sources)==0:            
-        encoded_query = quote_plus(query)
-        url = f"https://news.google.com/rss/search?q={encoded_query}&gl={country[0]}&ceid={country[0]}:{language[0]}"
+    else:            
+        encoded_query = quote_plus(query)        
+        url = base_url.format(query=encoded_query,country=country[0])
         urls_by_source.append(url)   
-   
-    state["urls"] = urls_by_source  
-    print(urls_by_source)
+
+    state["urls"] = urls_by_source    
     return state
 
 def clean_description(raw_html):
@@ -66,59 +69,57 @@ def retrieve_articles_metadata(state:AgentState)-> AgentState:
             state["past_searches"].append(entry.link)
             
             metadata = {
-                "title": entry.get("title", ""),
-                "link": entry.get("link", ""),
-                "pubDate": datetime(*entry.published_parsed[:6]).isoformat() if entry.get("published_parsed") else "",
-                "description": clean_description(entry.get("description", ""))
+                "title": getattr(entry, "title", ""),
+                "link": getattr(entry, "link", ""),
+                "pubDate": datetime(*entry.published_parsed[:6]).isoformat() if getattr(entry, "published_parsed", None) else "",
+                "description": clean_description(getattr(entry, "description", ""))
             }    
-            print(metadata["description"])       
+                 
             articles.append(metadata)
    
     state["articles_metadata"] = articles   
     
     return state
 
+# Function That will be distributed among threads
+def scrape_article(article):
+    try:
+        HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'}
+        real_url = gnewsdecoder(article['link'])["decoded_url"]
+        response = requests.get(real_url, headers=HEADERS, timeout=15)
 
-def retrieve_articles_text(state:AgentState) -> AgentState:
-    """Scrapper to retrieve article text"""
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'lxml')  # Uses lxml parser
+            text = soup.get_text(strip=True)
 
-    articles_metadata = state["articles_metadata"]
-
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'
-    }
-
-    potential_articles = []    
-    for i, article in enumerate(articles_metadata):           
-        url = article['link']
-        date = article['pubDate']        
-        # use beautiful soup to extract the article content        
-        try:
-            real_url = gnewsdecoder(url)
-            
-            response = requests.get(real_url["decoded_url"], headers=headers, timeout=15)            
-            # check if the request was successful
-            if response.status_code == 200:
-                # parse the HTML content
-                soup = BeautifulSoup(response.content, 'html.parser')
-
-                # find the article content
-                text = soup.get_text(strip=True)               
-
-                # append article dict to list
-                potential_articles.append({"title": article["title"], "url": real_url["decoded_url"], "description": article["description"], "text": text,"date":date})
-
-                # append the url to the processed urls
-                state["scraped_urls"].append(real_url["decoded_url"])
-                
-        except Exception as e:
-            print(f"Error fetching {url}: {e}")
+            return {
+                "title": article["title"],
+                "url": real_url,
+                "description": article["description"],
+                "text": text,
+                "date": article["pubDate"]
+            }, real_url
+    except Exception as e:
+        print(f"Error fetching {article['link']}: {e}")
     
-    # Append the processed articles to the state
-    state["potential_articles"].extend(potential_articles)  
+    return None, None
 
+def retrieve_articles_text(state: AgentState) -> AgentState:
+    articles_metadata = state["articles_metadata"]
+    potential_articles = []
+    scraped_urls = []
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = executor.map(scrape_article, articles_metadata)
+
+    for article_data, url in results:
+        if article_data:
+            potential_articles.append(article_data)
+            scraped_urls.append(url)
+
+    state["potential_articles"].extend(potential_articles)
+    state["scraped_urls"].extend(scraped_urls)
     return state
-
 
 def select_top_urls(state:AgentState) -> AgentState:
     """Based on article texts, choose the top-k articles to summarize"""
@@ -165,8 +166,10 @@ def summarize_articles_parallel(state:AgentState)-> AgentState:
     tldr_articles = state["tldr_articles"]
     model = os.getenv("REASONING_MODEL")    
     llm = ChatBedrockConverse(model=model,temperature=0)
+    language = state["languages"][0]
+
     prompt = """
-    Create a * bulleted summarizing tldr for the article in spanish:
+    Create a * bulleted summarizing tldr for the article only in {language} language:
     {text}
 
     Follow this exact format:
@@ -175,15 +178,17 @@ def summarize_articles_parallel(state:AgentState)-> AgentState:
     * tl;dr bulleted summary
     * use bullet points for each sentence
     """
+    
 
-    # iterate over the selected articles and collect summaries synchronously
+    # Iterate over the selected articles and collect summaries synchronously
     for i,_ in enumerate(tldr_articles):
         text = tldr_articles[i]["text"]
         title = tldr_articles[i]["title"]
         url = tldr_articles[i]["url"]
         
+        
         # invoke the llm synchronously
-        result = llm.invoke(prompt.format(title=title, url=url, text=text))
+        result = llm.invoke(prompt.format(title=title, url=url, text=text,language=language))
         tldr_articles[i]["summary"] = result.content
 
     state["tldr_articles"] = tldr_articles
@@ -192,20 +197,18 @@ def summarize_articles_parallel(state:AgentState)-> AgentState:
 
 def extract_topics_bias(state:AgentState)->AgentState:
     """Extract the main topics of the news and political bias."""
-
     tldr_articles = state["tldr_articles"]
     model = os.getenv("REASONING_MODEL")
     llm = ChatBedrockConverse(model=model,temperature=0)    
     analysis_parser = JsonOutputParser(pydantic_object=ArticleAnalysis)
-
+    language = state["languages"][0]
+    
     template = """
     You are a political media analysis assistant. Your task is to analyze the following news article to:
-
     1. Identify the main topics or entities discussed.
     2. Detect if the article presents any political bias.
-    3. Explain the reasoning behind the detected bias.
+    3. Explain the reasoning behind the detected bias in {language} language.
     4. Determine if the article is written as humor, parody, or satire.
-
     ### Use the following checklist to detect bias:
     - Is the article heavily opinionated or one-sided?
     - Does it rely on unsupported or unsubstantiated claims?
@@ -216,34 +219,34 @@ def extract_topics_bias(state:AgentState)->AgentState:
     - Is the author anonymous or lacks subject-matter expertise?
     - Is the article written as humor, parody, or satire?
     - Is it promotional in disguise?
-
     If the article is clearly written as humor, parody, or satire, classify the bias as `"humor"`.
-
     You must return a param dict object with the following formatting:
     {format_instructions}
-
     News Article:
     {text}
-
     """
+    
     # iterate over the selected articles and extract topics and bias
-    for i,_ in enumerate(tldr_articles):
-      
+    for i, _ in enumerate(tldr_articles):
         prompt_template = PromptTemplate(
-        template=template,
-        variables={"text":tldr_articles[i]["text"]},
-        partial_variables={"format_instructions":analysis_parser.get_format_instructions()}
+            template=template,
+            input_variables=["text", "language"],  # Changed from 'variables' to 'input_variables'
+            partial_variables={"format_instructions": analysis_parser.get_format_instructions()}
         )
-
         chain = prompt_template | llm | analysis_parser
         
-        result = chain.invoke({"text":tldr_articles[i]["text"]})
+        # Pass both text and language when invoking
+        result = chain.invoke({
+            "text": tldr_articles[i]["text"],
+            "language": language
+        })
+        
         tldr_articles[i]["topics"] = result["topics"]
         tldr_articles[i]["bias"] = result["bias"]
         tldr_articles[i]["bias_explanation"] = result["bias_explanation"]
-    
+   
     state["tldr_articles"] = tldr_articles
-    
+   
     return state
 
 def state_of_art(state:AgentState)->AgentState:
@@ -255,7 +258,7 @@ def state_of_art(state:AgentState)->AgentState:
     if state["mode"]=="advanced":
         model = os.getenv("REASONING_MODEL")
         llm = ChatBedrockConverse(model=model,temperature=0)   
-
+        language = state["languages"][0]
         bloque_articulos =""
 
         for i, art in enumerate(tldr_articles, 1):
@@ -267,7 +270,7 @@ def state_of_art(state:AgentState)->AgentState:
             """
 
         prompt = f"""
-        Eres un analista experto en medios de comunicación y actualidad global. Tu tarea es redactar un informe de contexto en idioma español,basado en un conjunto de noticias recuperados de la web al buscar la siguiente consulta.
+        Eres un analista experto en medios de comunicación y actualidad global. Tu tarea es redactar un informe de contexto en idioma {language},basado en un conjunto de noticias recuperados de la web al buscar la siguiente consulta.
 
         Consulta:
         {query}

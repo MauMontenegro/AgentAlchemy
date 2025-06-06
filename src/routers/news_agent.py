@@ -34,6 +34,7 @@ def create_initial_state(query:str,num_articles:int,source:list[str]=None,countr
 @router.post("/agent",response_model=AgentResponse)
 async def agent_call(request:AgentRequest):
     agent = ResearchAgent()
+    print(request.language)
     state = create_initial_state(request.query,request.articles,request.source,request.country,request.language,request.mode)
     final_state = await agent.graph.ainvoke(state)
 
