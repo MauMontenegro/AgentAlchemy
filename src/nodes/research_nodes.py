@@ -19,7 +19,7 @@ from langchain_aws import ChatBedrockConverse
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 
-from src.schemas.schemas import AgentState,ArticleAnalysis
+from src.schemas.schemas import AgentState,ArticleAnalysis,ArticleBulletSummary
 
 load_dotenv()
 
@@ -86,7 +86,7 @@ def scrape_article(article):
     try:
         HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36'}
         real_url = gnewsdecoder(article['link'])["decoded_url"]
-        response = requests.get(real_url, headers=HEADERS, timeout=15)
+        response = requests.get(real_url, headers=HEADERS, timeout=20)
 
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'lxml')  # Uses lxml parser
@@ -119,12 +119,14 @@ def retrieve_articles_text(state: AgentState) -> AgentState:
 
     state["potential_articles"].extend(potential_articles)
     state["scraped_urls"].extend(scraped_urls)
+    state["num_searches_remaining"] -= 1
+
+   
     return state
 
 def select_top_urls(state:AgentState) -> AgentState:
-    """Based on article texts, choose the top-k articles to summarize"""
-    print("Selecting Top Urls")
-    # Instantiate LLM model
+    """Based on article texts, choose the top-k articles to summarize"""   
+    
     model = os.getenv("REASONING_MODEL")    
     llm = ChatBedrockConverse(model=model,temperature=0)   
 
@@ -134,8 +136,7 @@ def select_top_urls(state:AgentState) -> AgentState:
 
     potential_articles = state["potential_articles"]
 
-    formatted_metadata = "\n".join([f"{article['url']}\n{article['description']}\n" for article in potential_articles])
-    print(formatted_metadata)
+    formatted_metadata = "\n".join([f"{article['url']}\n{article['description']}\n" for article in potential_articles])    
 
     prompt = f"""
     Based on the user news query:
@@ -143,56 +144,72 @@ def select_top_urls(state:AgentState) -> AgentState:
 
     Reply with a list of strings of up to {num_articles_tldr} relevant urls.
     Don't add any urls that are not relevant or aren't listed specifically.
+    Add only valid urls. 
     {formatted_metadata}
     """
-
     result = llm.invoke(prompt).content
-    print(result)
+    
     # TODO: Mejorar pattern matching con librerias
     url_pattern = r'(https?://[^\s",]+)'
 
-    urls = re.findall(url_pattern, result)
+    urls = re.findall(url_pattern, result)    
 
     tldr_articles = [article for article in potential_articles if article['url'] in urls]   
 
-    print(urls)
-
     state["tldr_articles"] = tldr_articles   
-
+    
     return state
 
 def summarize_articles_parallel(state:AgentState)-> AgentState:
     """Summarize the articles based on full text in parallel."""
+    
     tldr_articles = state["tldr_articles"]
     model = os.getenv("REASONING_MODEL")    
     llm = ChatBedrockConverse(model=model,temperature=0)
+    bullet_parser = JsonOutputParser(pydantic_object=ArticleBulletSummary)
     language = state["languages"][0]
 
-    prompt = """
-    Create a * bulleted summarizing tldr for the article only in {language} language:
-    {text}
+    template = """
+    Create a * bulleted summarizing tldr for the article using {language} language. Translate if it is neccesary.
 
-    Follow this exact format:
-    {title}
-    {url}
-    * tl;dr bulleted summary
-    * use bullet points for each sentence
+    Article:
+    {text}
+    
+    This is the title of the new:{title}
+    This is the url of the new:{url}
+
+    You must return a param dict object with the following formatting:
+    {format_instructions}
+
+    Each * bullet must be in a new line
     """
     
-
     # Iterate over the selected articles and collect summaries synchronously
     for i,_ in enumerate(tldr_articles):
         text = tldr_articles[i]["text"]
         title = tldr_articles[i]["title"]
         url = tldr_articles[i]["url"]
         
-        
         # invoke the llm synchronously
-        result = llm.invoke(prompt.format(title=title, url=url, text=text,language=language))
-        tldr_articles[i]["summary"] = result.content
+        prompt_template = PromptTemplate(
+            template=template,
+            input_variables=["text", "language","title","url"],
+            partial_variables={"format_instructions": bullet_parser.get_format_instructions()}
+        )
+        chain = prompt_template | llm | bullet_parser
+        
+        # Pass both text and language when invoking
+        result = chain.invoke({
+            "text": text,
+            "language": language,
+            "title": title,
+            "url":url
+        })
 
+        tldr_articles[i]["summary"] = result
+        
     state["tldr_articles"] = tldr_articles
-
+    
     return state
 
 def extract_topics_bias(state:AgentState)->AgentState:
@@ -202,7 +219,7 @@ def extract_topics_bias(state:AgentState)->AgentState:
     llm = ChatBedrockConverse(model=model,temperature=0)    
     analysis_parser = JsonOutputParser(pydantic_object=ArticleAnalysis)
     language = state["languages"][0]
-    
+   
     template = """
     You are a political media analysis assistant. Your task is to analyze the following news article to:
     1. Identify the main topics or entities discussed.
@@ -226,7 +243,7 @@ def extract_topics_bias(state:AgentState)->AgentState:
     {text}
     """
     
-    # iterate over the selected articles and extract topics and bias
+    # Iterate over the selected articles and extract topics and bias
     for i, _ in enumerate(tldr_articles):
         prompt_template = PromptTemplate(
             template=template,
@@ -246,7 +263,7 @@ def extract_topics_bias(state:AgentState)->AgentState:
         tldr_articles[i]["bias_explanation"] = result["bias_explanation"]
    
     state["tldr_articles"] = tldr_articles
-   
+    
     return state
 
 def state_of_art(state:AgentState)->AgentState:
@@ -306,14 +323,17 @@ def format_results(state: AgentState) -> AgentState:
     past_queries = state["news_query"]
     tldr_articles = state["tldr_articles"]
 
+    print("Formatting")
     formatted_summaries = []
     for article in tldr_articles:
-        lines = article["summary"].strip().split("\n")
-        title = lines[0]
-        url = lines[1]
-        date = article.get('date','missing')
-        bullets = [line.strip("* ").strip() for line in lines[2:] if line.startswith("*")]
-
+              
+        lines = article["summary"]["bullet_summary"].strip().split("\n")
+        print(article["summary"]["bullet_summary"])
+        title = article["summary"]["title"]
+        url = article["summary"]["url"]
+        date = article.get('date','missing')         
+        bullets = [line.strip("* ").strip() for line in lines if line.startswith("*")]
+        print(bullets)
         formatted_summaries.append({
             "title": title,
             "url": url,
@@ -329,7 +349,7 @@ def format_results(state: AgentState) -> AgentState:
         "summaries": formatted_summaries,
         "report":state["report"]
     }
-
+   
     return state
 
 # Decision Edges

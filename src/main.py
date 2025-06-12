@@ -1,12 +1,36 @@
 from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine
+from contextlib import asynccontextmanager
+
 from src.routers.news_agent import router as news_agent_router
 from src.routers.scrap_agent import router as scrap_agent_router
-from fastapi.middleware.cors import CORSMiddleware
+from src.routers.users import router as user_router
+from src.models.models import Base
+from src.routers.auth_route import router as auth_router
 
-app = FastAPI(title="Sistema de Agentes Inteligentes Petroil",version="0.1")
+from src.services.db_connection import engine,AsyncSessionLocal
+
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+load_dotenv()
+
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    _ = app
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        print("Tablas de usuarios creadas o verificadas correctamente")
+    yield
+
+app = FastAPI(title="Sistema de Agentes Inteligentes Petroil",version="0.1",lifespan=lifespan)
 
 app.include_router(news_agent_router,prefix="/newsagent",tags=["Agents"])
 app.include_router(scrap_agent_router,prefix="/scrapagent",tags=["Agents"])
+app.include_router(user_router,tags=["User"])
+app.include_router(auth_router,tags=["Auth"])
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,8 +38,9 @@ app.add_middleware(
     "http://localhost:5173",
     "http://127.0.0.1:5173",],
     allow_methods=["*"],
-    allow_headers=["*"],
-)
+    allow_headers=["*"],)
+
+
 
 @app.get("/")
 def init_page():

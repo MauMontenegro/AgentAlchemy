@@ -26,16 +26,7 @@ class ScraperAgentState(TypedDict):
     url: Annotated[List,"Url of the article, doc or news to scrap"]
     title: Annotated[str,"Title of the url article"]
     text: Annotated[List,"List of Body Texts of the articles"]
-    summary: Annotated[str,"Summary of Article"]   
-
-class NewsApiParams(BaseModel):
-    """Parameters needed to do a NEWSAPI search"""
-    q: str = Field(description ="User Query")
-    #sources: str =Field(description="comma-separated list of sources from: 'abc-news,abc-news-au,associated-press,australian-financial-review,axios,bbc-news,bbc-sport,bloomberg,business-insider,cbc-news,cbs-news,cnn,financial-post,fortune'")
-    from_param: str = Field(description="date in format 'YYYY-MM-DD' Two days ago minimum. Extend up to 30 days on second and subsequent requests.")
-    to: str = Field(description="date in format 'YYYY-MM-DD' today's date unless specified")
-    language: str = Field(description="language of articles 'es' unless specified one of ['ar', 'de', 'en', 'es', 'fr', 'he', 'it', 'nl', 'no', 'pt', 'ru', 'se', 'ud', 'zh']")
-    sort_by: str = Field(description="sort by 'relevancy', 'popularity', or 'publishedAt', by default is 'publishedAt'")
+    summary: Annotated[str,"Summary of Article"]
 
 class AgentRequest(BaseModel):
     # Required Fields
@@ -47,7 +38,7 @@ class AgentRequest(BaseModel):
 
     # Optional fields
     source: Optional[List[str]] = Field(None, description="Specific news source domain (e.g. 'bbc.com')")
-    language: Optional[List[str]] = Field(None, description="Language code for news filtering (e.g. 'es', 'en')")
+    language: Optional[List[str]] = Field(None, description="Language display for news (e.g. 'spanish', 'english')")
     country: Optional[List[str]] = Field(None, description="Country code for news filtering (e.g. 'VE', 'US')")
 
 class ArticleSummary(BaseModel):
@@ -63,6 +54,11 @@ class ArticleAnalysis(BaseModel):
     topics: List[str] = Field(description="Main topics or entities in the news article.")
     bias: Literal["center", "left", "right", "humor"] = Field(description="Detected political bias.")
     bias_explanation: str = Field(description="Explanation for the detected political bias.")
+
+class ArticleBulletSummary(BaseModel):
+    title:str = Field(description="Title of the New")
+    url:HttpUrl = Field(description="Url of the New")
+    bullet_summary: str = Field(description= "* tl;dr bulleted summary, use bullet points for each sentences in a new line")
 
 class AgentResponse(BaseModel):
     header: str
