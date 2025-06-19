@@ -10,6 +10,7 @@ class AgentState(TypedDict):
     num_articles_tldr: Annotated[int, "Number of articles to create TL;DR for."]
     urls: Annotated[List[str],"Urls to scrap."]
 
+    max_feed_entries: Annotated[int, "Max number of articles to retrieve from each feed."]
     num_searches_remaining: Annotated[int, "Number of articles to search for."]
     newsapi_params: Annotated[dict, "Structured argument for the News API."]
     past_searches: Annotated[List[dict], "List of search params already used."]

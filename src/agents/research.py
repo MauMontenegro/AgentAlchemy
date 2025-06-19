@@ -7,7 +7,7 @@ from src.nodes.research_nodes import (
     select_top_urls,
     summarize_articles_parallel,
     format_results,
-    articles_text_decision,
+    articles_text_decision,   
     extract_topics_bias,
     state_of_art
 )
@@ -34,14 +34,14 @@ class ResearchAgent():
         
         # Flow of the graph       
         workflow.add_edge(START,"generate_params")
-        workflow.add_edge("generate_params","fetch_metadata")
-        workflow.add_edge("fetch_metadata","articles_text")
+        workflow.add_edge("generate_params","fetch_metadata") 
+        workflow.add_edge("fetch_metadata", "articles_text")      
         workflow.add_conditional_edges(
             "articles_text",
             articles_text_decision,
             {
-                "generate_newsapi_params": "generate_params",
-                "select_top_urls":"top_urls",
+                "not_enough_articles": "fetch_metadata",
+                "enough_articles":"top_urls",
                 "END": END
             }          
         )

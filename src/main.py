@@ -19,9 +19,12 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app:FastAPI):
     _ = app
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        print("Tablas de usuarios creadas o verificadas correctamente")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            print("Tablas de usuarios creadas o verificadas correctamente")
+    except Exception as e:
+            print(f"Error al crear las tablas de usuarios: {e}")
     yield
 
 app = FastAPI(title="Sistema de Agentes Inteligentes Petroil",version="0.1",lifespan=lifespan)
@@ -34,12 +37,15 @@ app.include_router(auth_router,tags=["Auth"])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://agent-alchemy-front.vercel.app","http://localhost",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",],
-    allow_methods=["*"],
-    allow_headers=["*"],)
-
+    allow_origins=[
+        "https://agent-alchemy-front.vercel.app",
+        "http://localhost",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 
 @app.get("/")
@@ -47,8 +53,7 @@ def init_page():
     """
         Punto de entrada para el backend.
         Determina si el servicio está Online.
-    """
-    
+    """    
     return {"message":"La plataforma de SAIP se encuentra operativa."}
 
 @app.get("/health")
