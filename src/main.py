@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from src.routers.news_agent import router as news_agent_router
 from src.routers.scrap_agent import router as scrap_agent_router
 from src.routers.users import router as user_router
+from src.routers.ocr_agent import router as ocr_agent_router
+
 from src.models.models import Base
 from src.routers.auth_route import router as auth_router
 
@@ -31,6 +33,7 @@ app = FastAPI(title="Sistema de Agentes Inteligentes Petroil",version="0.1",life
 
 app.include_router(news_agent_router,prefix="/newsagent",tags=["Agents"])
 app.include_router(scrap_agent_router,prefix="/scrapagent",tags=["Agents"])
+app.include_router(ocr_agent_router, prefix="/ocragent", tags=["Agents"])
 app.include_router(user_router,tags=["User"])
 app.include_router(auth_router,tags=["Auth"])
 

@@ -208,11 +208,9 @@ def retrieve_articles_text(state: AgentState) -> AgentState:
     logging.info(f"Article retrieval complete: {success_count} successful, {failure_count} failed")
     
     # Update state
-    state["potential_articles"].extend(retrieved_articles)
-    logging.info(f"State updated: {len(retrieved_articles)} new articles added")
+    state["potential_articles"].extend(retrieved_articles)    
     state["scraped_urls"].extend(retrieved_urls)
-    state["max_feed_entries"]= state["num_articles_tldr"] - len(state["potential_articles"])
-    logging.info
+    state["max_feed_entries"]= state["num_articles_tldr"] - len(state["potential_articles"])   
     state["num_searches_remaining"] -= 1
     
     logging.info(f"State updated: {len(retrieved_articles)} new articles added, {state['num_searches_remaining']} searches remaining")

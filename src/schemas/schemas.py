@@ -72,4 +72,12 @@ class ScrapAgentRequest(BaseModel):
 class ScrapAgentResponse(BaseModel):
     summary:str = Field(description="Summary of the article")
 
+# OCR SCHEMAS
+class OCRResponse(BaseModel):
+    structured : dict = Field(description="Structured text extracted from the file")
 
+class OcrAgentState(TypedDict):
+    file: Optional[bytes]
+    extracted_text: Optional[str]
+    schema: dict
+    structured: Optional[dict]
