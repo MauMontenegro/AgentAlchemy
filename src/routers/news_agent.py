@@ -1,9 +1,9 @@
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from src.schemas.schemas import AgentRequest, AgentResponse
 from src.agents.research import ResearchAgent
-from src.routers.auth_route import get_current_user
+from src.routers.auth_route import get_current_user, oauth2_scheme
 from src.models.models import User
 
 # Configure logging
@@ -61,12 +61,13 @@ def create_initial_state(
     return state
 
 @router.post("/agent", response_model=AgentResponse, summary="Process news search request")
-async def agent_call(request: AgentRequest,current_user:User=Depends(get_current_user)):
+async def agent_call(request: AgentRequest, current_user: User = Depends(get_current_user)):
     """
     Process a news search request and return summarized articles.
     
     Args:
         request: The news search request parameters
+        current_user: The authenticated user (injected by dependency)
         
     Returns:
         Formatted results with article summaries
@@ -75,7 +76,12 @@ async def agent_call(request: AgentRequest,current_user:User=Depends(get_current
         HTTPException: If there's an error processing the request
     """
     try:
-        logger.info(f"Processing news request for query: {request.query}")
+        # Validate user is authenticated
+        if not current_user:
+            logger.error("Authentication failed: No user provided")
+            raise HTTPException(status_code=401, detail="Authentication required")
+            
+        logger.info(f"Processing news request for query: {request.query} by user: {current_user.username}")
         agent = ResearchAgent()
         
         state = create_initial_state(
@@ -109,6 +115,65 @@ async def agent_call(request: AgentRequest,current_user:User=Depends(get_current
                 summaries=final_state.get("tldr_articles", []),
                 report=final_state.get("report", "")
             )
+    except HTTPException as he:
+        # Re-raise HTTP exceptions without modification
+        logger.error(f"HTTP error in news request: {str(he)}")
+        raise
     except Exception as e:
         logger.error(f"Error processing news request: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+@router.post("/agent-test", response_model=AgentResponse, summary="Test endpoint for news search without authentication")
+async def agent_call_test(request: AgentRequest):
+    """
+    Test endpoint for processing a news search request without authentication.
+    Use this for testing when authentication issues occur.
+    
+    Args:
+        request: The news search request parameters
+        
+    Returns:
+        Formatted results with article summaries
+        
+    Raises:
+        HTTPException: If there's an error processing the request
+    """
+    try:
+        logger.info(f"Processing test news request for query: {request.query}")
+        agent = ResearchAgent()
+        
+        state = create_initial_state(
+            request.query,
+            request.articles,
+            request.source,
+            request.country,
+            request.language,
+            request.mode
+        )
+        
+        final_state = await agent.graph.ainvoke(state)
+
+        if not final_state.get("tldr_articles"):            
+            logger.warning(f"No articles found for query: {request.query}")
+            return AgentResponse(
+                header="No articles found",
+                summaries=[],
+                report="No state of the art"
+            )
+        
+        logger.info(f"Successfully processed test news request for query: {request.query}")
+        
+        # Make sure we return the correct format expected by AgentResponse
+        if isinstance(final_state["formatted_results"], dict) and all(key in final_state["formatted_results"] for key in ["header", "summaries", "report"]):
+            return final_state["formatted_results"]
+        else:
+            # If formatted_results is not already in the correct format, create a proper AgentResponse
+            return AgentResponse(
+                header=f"Results for: {request.query}",
+                summaries=final_state.get("tldr_articles", []),
+                report=final_state.get("report", "")
+            )
+    except Exception as e:
+        logger.error(f"Error processing test news request: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+

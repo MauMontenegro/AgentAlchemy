@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security import OAuth2PasswordRequestForm
@@ -7,6 +8,9 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 from src.services.db_connection import AsyncSessionLocal
 from src.models.models import User
@@ -72,23 +76,43 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     try:
+        # Validate SECRET_KEY is available
+        if not SECRET_KEY:
+            logger.error("SECRET_KEY is not configured")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Authentication system misconfigured"
+            )
+            
+        # Decode token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token inválido")
+            raise HTTPException(status_code=401, detail="Token inválido")            
+            
+    except JWTError as e:
+        # Log the specific JWT error
+        print(f"JWT Error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
     
-    # Buscar usuario
-    result = await db.execute(
-        select(User).where(User.username == username)
-    )
-    user = result.scalar_one_or_none()
-    
-    if user is None:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
-    
-    return user
+    try:
+        # Buscar usuario
+        result = await db.execute(
+            select(User).where(User.username == username)
+        )
+        user = result.scalar_one_or_none()
+        
+        if user is None:
+            raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        
+        return user
+    except Exception as e:
+        # Log database errors
+        print(f"Database error in get_current_user: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving user information"
+        )
 
 # También en auth_route.py o en un archivo separado:
 async def require_admin(current_user: User = Depends(get_current_user)):

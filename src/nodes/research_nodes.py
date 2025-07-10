@@ -95,7 +95,7 @@ def retrieve_articles_metadata(state: AgentState) -> AgentState:
                 feed = feedparser.parse(url)
                 
                 # Check if parsing was successful
-                if feed.get('bozo_exception'):
+                if getattr(feed, 'bozo', False) and feed.get('bozo_exception'):
                     logging.warning(f"Error parsing feed at {url}: {feed.bozo_exception}")
                     continue
                     
@@ -109,8 +109,13 @@ def retrieve_articles_metadata(state: AgentState) -> AgentState:
                 total_processed += len(feed.entries[len(state["past_searches"]):max_feed_articles+len(state["past_searches"])])
                     
                 # Filter entries not already in past_searches. If its a retry move index + 10
-                new_entries = [entry for entry in feed.entries[len(state["past_searches"]):max_feed_articles+len(state["past_searches"])] 
-                              if entry.link not in state["past_searches"]]
+                # Fix the indentation and move the condition inside the list comprehension
+                new_entries = [
+                    entry for entry in feed.entries[
+                        len(state["past_searches"]):max_feed_articles+len(state["past_searches"])
+                    ] 
+                    if entry.link not in state.get("past_searches", [])
+                ]
                 
                 if not new_entries:
                     logging.debug(f"No new entries found in feed at {url}")
@@ -321,11 +326,25 @@ def select_top_urls(state:AgentState) -> AgentState:
     
     return state
 
+import time
+
+def retry_on_throttling(chain,inputs,retries=4):
+    for i in range(retries):
+        try:
+            return chain.invoke(inputs)
+        except Exception as e:
+            if "ThrottlingException" in str(e) or "Too many tokens" in str(e):
+                wait_time = 2 ** i  # Exponential backoff
+                logging.warning(f"Throttling detected, retrying in {wait_time} seconds")
+                time.sleep(wait_time)
+            else:
+                raise
+    raise RuntimeError("Too many throttling errors.")
 
 def summarize_articles_parallel(state:AgentState)-> AgentState:
     """Summarize the articles based on full text in parallel."""
-    
-    tldr_articles = state["tldr_articles"]
+    MAX_CHARS = 16000
+    tldr_articles = state["tldr_articles"][:MAX_CHARS]
     model = os.getenv("REASONING_MODEL")    
     llm = ChatBedrockConverse(model=model,temperature=0)
     bullet_parser = JsonOutputParser(pydantic_object=ArticleBulletSummary)
@@ -347,12 +366,13 @@ def summarize_articles_parallel(state:AgentState)-> AgentState:
     """
     
     # Iterate over the selected articles and collect summaries synchronously
-    for i,_ in enumerate(tldr_articles):
+    for i,_ in enumerate(tldr_articles):       
         text = tldr_articles[i]["text"]
         title = tldr_articles[i]["title"]
         url = tldr_articles[i]["url"]
+
+        logging.info(f"Summarizing article:{url}")        
         
-        # invoke the llm synchronously
         prompt_template = PromptTemplate(
             template=template,
             input_variables=["text", "language","title","url"],
@@ -362,12 +382,13 @@ def summarize_articles_parallel(state:AgentState)-> AgentState:
         
         try:
             # Pass both text and language when invoking
-            result = chain.invoke({
-                "text": text,
-                "language": language,
-                "title": title,
-                "url": url
+            result = retry_on_throttling(chain, {
+            "text": text[:MAX_CHARS],
+            "language": language,
+            "title": title,
+            "url": url
             })
+
             tldr_articles[i]["summary"] = result
         except Exception as e:
             logging.error(f"Error summarizing article {i} ({title}): {e}")
@@ -449,11 +470,10 @@ def extract_topics_bias(state: AgentState) -> AgentState:
         chain = prompt_template | llm | analysis_parser
         
         # Pass both text and language when invoking
-        result = chain.invoke({
+        result = retry_on_throttling(chain, {
             "text": tldr_articles[i]["text"],
             "language": language
-        })
-        
+            })        
         try:
             # Safely access result dictionary keys with get() method
             tldr_articles[i]["topics"] = result.get("topics", [])

@@ -71,6 +71,10 @@ def clean_description(raw_html):
 
 @patch("src.nodes.research_nodes.feedparser.parse")
 def test_retrieve_articles_metadata(mock_parse, rss_state):
+    # Set max_feed_entries in the test state
+    rss_state["max_feed_entries"] = 10
+    rss_state["past_searches"] = []  # Ensure past_searches is empty
+
     # Create a mock feed entry
     fixed_datetime = datetime(2024, 6, 5, 15, 0, 0)
     mock_entry = SimpleNamespace(
@@ -80,9 +84,14 @@ def test_retrieve_articles_metadata(mock_parse, rss_state):
         description="<p>This is a <b>test</b> description.</p>"
         )
 
-    # Mock feedparser.parse to return a fake feed
-    mock_parse.return_value.entries = [mock_entry]
-
+    # Create a proper mock feed response
+    mock_feed = SimpleNamespace(
+        entries=[mock_entry],
+        bozo=False,  # Important: Set bozo to False to indicate no parsing error
+        bozo_exception=None,
+        feed={}  # Add required feed attribute
+    )   
+    mock_parse.return_value = mock_feed
     # Run the node
     updated_state = retrieve_articles_metadata(rss_state)
 

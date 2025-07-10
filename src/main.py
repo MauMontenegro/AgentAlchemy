@@ -1,18 +1,16 @@
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
 from contextlib import asynccontextmanager
 
 from src.routers.news_agent import router as news_agent_router
 from src.routers.scrap_agent import router as scrap_agent_router
 from src.routers.users import router as user_router
 from src.routers.ocr_agent import router as ocr_agent_router
-
+from src.routers.signup import router as signup_router
+from src.routers.rag_agent import router as rag_agent_router
+from src.routers.contexts import router as context_router
 from src.models.models import Base
 from src.routers.auth_route import router as auth_router
-
-from src.services.db_connection import engine,AsyncSessionLocal
-
+from src.services.db_connection import engine
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -36,7 +34,9 @@ app.include_router(scrap_agent_router,prefix="/scrapagent",tags=["Agents"])
 app.include_router(ocr_agent_router, prefix="/ocragent", tags=["Agents"])
 app.include_router(user_router,tags=["User"])
 app.include_router(auth_router,tags=["Auth"])
-
+app.include_router(signup_router, prefix="/signup",tags=["Sign-Up"])
+app.include_router(rag_agent_router, prefix="/ragagent", tags=["Agents"])
+app.include_router(context_router,tags=["Context"])
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +48,7 @@ app.add_middleware(
     ],
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
+    allow_credentials=True    
 )
 
 
