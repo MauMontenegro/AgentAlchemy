@@ -1,0 +1,332 @@
+[
+    {
+        "name": "im_Iva",
+        "type": "FLOAT",
+        "description": "Importe del IVA de la venta"
+    },
+    {
+        "name": "nu_Dia",
+        "type": "INTEGER",
+        "description": "Número del día (1-31)"
+    },
+    {
+        "name": "nu_Mes",
+        "type": "INTEGER",
+        "description": "Número del mes (1-12)"
+    },
+    {
+        "name": "nb_Pais",
+        "type": "STRING",
+        "description": "Nombre del país"
+    },
+    {
+        "name": "nb_Zona",
+        "type": "STRING",
+        "description": "Nombre de la zona geográfica"
+    },
+    {
+        "name": "nu_Anio",
+        "type": "INTEGER",
+        "description": "Año de la transacción"
+    },
+    {
+        "name": "im_Total",
+        "type": "FLOAT",
+        "description": "Importe total de la venta"
+    },
+    {
+        "name": "nb_Estado",
+        "type": "STRING",
+        "description": "Nombre del estado/provincia"
+    },
+    {
+        "name": "de_Estatus",
+        "type": "STRING",
+        "description": "Descripción del estatus del documento (ej: TIMBRADA)"
+    },
+    {
+        "name": "id_Cliente",
+        "type": "INTEGER",
+        "description": "Identificador único del cliente"
+    },
+    {
+        "name": "nb_Cliente",
+        "type": "STRING",
+        "description": "Nombre del cliente"
+    },
+    {
+        "name": "nb_Empresa",
+        "type": "STRING",
+        "description": "Nombre de la empresa"
+    },
+    {
+        "name": "fl_Remision",
+        "type": "STRING",
+        "description": "Folio de la remisión"
+    },
+    {
+        "name": "id_Producto",
+        "type": "INTEGER",
+        "description": "Identificador único del producto"
+    },
+    {
+        "name": "id_Remision",
+        "type": "INTEGER",
+        "description": "Identificador único de la remisión"
+    },
+    {
+        "name": "id_Vendedor",
+        "type": "INTEGER",
+        "description": "Identificador único del vendedor"
+    },
+    {
+        "name": "im_Subtotal",
+        "type": "FLOAT",
+        "description": "Importe subtotal de la venta (sin IVA)"
+    },
+    {
+        "name": "nb_Estacion",
+        "type": "STRING",
+        "description": "Nombre de la estación de servicio"
+    },
+    {
+        "name": "nb_Producto",
+        "type": "STRING",
+        "description": "Nombre del producto vendido"
+    },
+    {
+        "name": "nb_Sucursal",
+        "type": "STRING",
+        "description": "Nombre de la sucursal"
+    },
+    {
+        "name": "nb_Vendedor",
+        "type": "STRING",
+        "description": "Nombre del vendedor"
+    },
+    {
+        "name": "nu_Estacion",
+        "type": "INTEGER",
+        "description": "Número de la estación"
+    },
+    {
+        "name": "id_Ejercicio",
+        "type": "INTEGER",
+        "description": "Identificador del ejercicio fiscal"
+    },
+    {
+        "name": "im_Descuento",
+        "type": "FLOAT",
+        "description": "Importe del descuento aplicado"
+    },
+    {
+        "name": "nb_Municipio",
+        "type": "STRING",
+        "description": "Nombre del municipio"
+    },
+    {
+        "name": "fl_Movimiento",
+        "type": "STRING",
+        "description": "Folio del movimiento"
+    },
+    {
+        "name": "nb_TipoFilial",
+        "type": "STRING",
+        "description": "Tipo de filial (ej: NO Filial venta)"
+    },
+    {
+        "name": "cantidadLitros",
+        "type": "FLOAT",
+        "description": "Cantidad en litros del producto vendido"
+    },
+    {
+        "name": "cliente_Activo",
+        "type": "STRING",
+        "description": "Indica si el cliente está activo (SI/NO)"
+    },
+    {
+        "name": "de_TipoCliente",
+        "type": "STRING",
+        "description": "Descripción del tipo de cliente (ej: Gasolineras)"
+    },
+    {
+        "name": "im_Retenciones",
+        "type": "FLOAT",
+        "description": "Importe de las retenciones aplicadas"
+    },
+    {
+        "name": "sn_Combustible",
+        "type": "BOOLEAN",
+        "description": "Indica si es combustible (TRUE/FALSE)"
+    },
+    {
+        "name": "id_DetalleVenta",
+        "type": "INTEGER",
+        "description": "Identificador único del detalle de venta"
+    },
+    {
+        "name": "id_GrupoCliente",
+        "type": "INTEGER",
+        "description": "Identificador único del grupo de cliente"
+    },
+    {
+        "name": "nb_GrupoCliente",
+        "type": "STRING",
+        "description": "Nombre del grupo de cliente"
+    },
+    {
+        "name": "nb_TipoProducto",
+        "type": "STRING",
+        "description": "Tipo de producto (ej: Gasolina Magna)"
+    },
+    {
+        "name": "id_tipoDeNegocio",
+        "type": "INTEGER",
+        "description": "Identificador del tipo de negocio"
+    },
+    {
+        "name": "nb_TipoDeNegocio",
+        "type": "STRING",
+        "description": "Nombre del tipo de negocio (ej: Distribuidora)"
+    },
+    {
+        "name": "de_TipoMovimiento",
+        "type": "STRING",
+        "description": "Descripción del tipo de movimiento (ej: Factura)"
+    },
+    {
+        "name": "fl_FolioDocumento",
+        "type": "STRING",
+        "description": "Folio del documento"
+    },
+    {
+        "name": "im_precioUnitario",
+        "type": "FLOAT",
+        "description": "Precio unitario del producto"
+    },
+    {
+        "name": "nb_TipoDeEstacion",
+        "type": "STRING",
+        "description": "Tipo de estación (ej: Bandera Blanca)"
+    },
+    {
+        "name": "sn_ContarEstacion",
+        "type": "INTEGER",
+        "description": "Indicador para contar estación (0/1)"
+    },
+    {
+        "name": "sn_PerteneceGrupo",
+        "type": "STRING",
+        "description": "Indica si pertenece a un grupo (SI/NO)"
+    },
+    {
+        "name": "cliente_Suspendido",
+        "type": "STRING",
+        "description": "Indica si el cliente está suspendido (SI/NO)"
+    },
+    {
+        "name": "nb_FamiliaProducto",
+        "type": "STRING",
+        "description": "Nombre de la familia del producto (ej: Gasolinas)"
+    },
+    {
+        "name": "nb_SectorEconomico",
+        "type": "STRING",
+        "description": "Nombre del sector económico (ej: ENERGETICO)"
+    },
+    {
+        "name": "de_TipoClientegrupo",
+        "type": "STRING",
+        "description": "Descripción del tipo de cliente grupo (ej: Grupo Gasolineras)"
+    },
+    {
+        "name": "nb_VendedorHeredado",
+        "type": "STRING",
+        "description": "Nombre del vendedor heredado"
+    },
+    {
+        "name": "nb_SubSectorEconomico",
+        "type": "STRING",
+        "description": "Nombre del subsector económico (ej: GASOLINERAS)"
+    },
+    {
+        "name": "nb_FamiliaTableroVentas",
+        "type": "STRING",
+        "description": "Familia para tablero de ventas (ej: Gasolinas)"
+    },
+    {
+        "name": "nb_TipoVendedorHeredado",
+        "type": "STRING",
+        "description": "Tipo de vendedor heredado (SI/NO)"
+    },
+    {
+        "name": "nu_OrdenGeograficoPlaza",
+        "type": "INTEGER",
+        "description": "Orden geográfico de la plaza"
+    },
+    {
+        "name": "nb_AbreviaturaTipoEstacion",
+        "type": "STRING",
+        "description": "Abreviatura del tipo de estación (ej: BCA)"
+    },
+    {
+        "name": "nu_OrdenImpresionEstaciones",
+        "type": "INTEGER",
+        "description": "Orden de impresión de las estaciones"
+    },
+    {
+        "name": "fh_movimiento",
+        "type": "DATE",
+        "description": "Fecha del movimiento/transacción"
+    },
+    {
+        "name": "fh_Documento",
+        "type": "DATE",
+        "description": "Fecha del documento"
+    },
+    {
+        "name": "fh_AltaCliente",
+        "type": "DATETIME",
+        "description": "Fecha y hora de alta del cliente"
+    },
+    {
+        "name": "fh_AltaGrupo",
+        "type": "DATETIME",
+        "description": "Fecha y hora de alta del grupo"
+    },
+    {
+        "name": "fh_UltimaCompraGrupo",
+        "type": "DATETIME",
+        "description": "Fecha y hora de la última compra del grupo"
+    },
+    {
+        "name": "fh_PrimeraCompraGrupo",
+        "type": "DATETIME",
+        "description": "Fecha y hora de la primera compra del grupo"
+    },
+    {
+        "name": "fh_UltimaCompraCliente",
+        "type": "DATETIME",
+        "description": "Fecha y hora de la última compra del cliente"
+    },
+    {
+        "name": "fh_PrimeraCompraCliente",
+        "type": "DATETIME",
+        "description": "Fecha y hora de la primera compra del cliente"
+    },
+    {
+        "name": "fh_PrimeroCompraGrupoPlaza",
+        "type": "DATETIME",
+        "description": "Fecha y hora de la primera compra del grupo en la plaza"
+    },
+    {
+        "name": "id_Empresa",
+        "type": "INTEGER",
+        "description": "Identificador único de la empresa"
+    },
+    {
+        "name": "id_sucursal",
+        "type": "INTEGER",
+        "description": "Identificador único de la sucursal"
+    }
+]

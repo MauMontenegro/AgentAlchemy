@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import date
 from functools import lru_cache
 from typing import List, Dict, Type, Any
 
@@ -22,7 +22,7 @@ SUPPORTED_FIELD_TYPES: Dict[str, Type] = {
     "bool": bool,
     "list": List[Any],
     "dict": dict,
-    "date": datetime
+    "date": date
 }
 
 # File type validation

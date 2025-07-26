@@ -8,6 +8,7 @@ from src.routers.ocr_agent import router as ocr_agent_router
 from src.routers.signup import router as signup_router
 from src.routers.rag_agent import router as rag_agent_router
 from src.routers.contexts import router as context_router
+from src.routers.finanzas import router as finanzas_router
 from src.models.models import Base
 from src.routers.auth_route import router as auth_router
 from src.services.db_connection import engine
@@ -32,6 +33,7 @@ app = FastAPI(title="Sistema de Agentes Inteligentes Petroil",version="0.1",life
 app.include_router(news_agent_router,prefix="/newsagent",tags=["Agents"])
 app.include_router(scrap_agent_router,prefix="/scrapagent",tags=["Agents"])
 app.include_router(ocr_agent_router, prefix="/ocragent", tags=["Agents"])
+app.include_router(finanzas_router, prefix="/finanzas", tags=["Agents"])
 app.include_router(user_router,tags=["User"])
 app.include_router(auth_router,tags=["Auth"])
 app.include_router(signup_router, prefix="/signup",tags=["Sign-Up"])
