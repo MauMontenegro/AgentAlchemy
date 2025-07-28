@@ -43,7 +43,7 @@ app.include_router(context_router,tags=["Context"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://agent-alchemy-front.vercel.app",
+        "https://saip-petroil.vercel.app",
         "http://localhost",
         "http://localhost:5173",
         "http://127.0.0.1:5173",

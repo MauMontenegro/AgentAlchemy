@@ -138,7 +138,7 @@ async def login(login_data: OAuth2PasswordRequestForm=Depends(), db: AsyncSessio
         
         if not user or not verify_password(login_data.password, user.hashed_password):
             # Log failed login attempt (in production, use proper logging)
-            print(f"Failed login attempt for username: {login_data.username}")
+            logger.info(f"Failed login attempt for username: {login_data.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
@@ -165,12 +165,19 @@ async def login(login_data: OAuth2PasswordRequestForm=Depends(), db: AsyncSessio
             "token_type": "bearer",
             "user": user_out
         }
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except ValueError as e:
         # Handle errors from create_access_token
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Token creation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Authentication system error"
+        )
     except Exception as e:
         # Log the error (in production, use proper logging)
-        print(f"Login error: {str(e)}")
+        logger.error(f"Login error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during authentication",

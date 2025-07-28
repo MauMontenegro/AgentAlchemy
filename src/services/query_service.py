@@ -30,9 +30,14 @@ class BigQueryService(QueryService):
         self.llm_client = llm_client
     
     async def generate_sql(self, query: str, schema: List[Dict]) -> str:
+        from datetime import datetime
         template = self._get_sql_template()
         response = await self.llm_client.ainvoke(
-            template.format(query=query, esquema=schema)
+            template.format(
+                query=query, 
+                esquema=schema,
+                fecha=datetime.now().strftime("%Y-%m-%d")
+            )
         )
         return self._clean_sql(response.content.strip())
     
@@ -65,6 +70,7 @@ class BigQueryService(QueryService):
         - Usa el formato: FROM `sipp-app.Tableros.Vis_Ventas`
         - Limita los resultados a un máximo de 100 filas usando LIMIT 100
         - Utiliza el siguiente esquema de la tabla: {esquema}
+        - La fecha actual es: {fecha}
 
         Pregunta del usuario: {query}
         

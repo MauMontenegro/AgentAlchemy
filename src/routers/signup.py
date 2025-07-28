@@ -17,19 +17,26 @@ async def signup_user(
     db: AsyncSession = Depends(get_db),    
 ):
     try:
-        # Check if user with same email already exists
-        existing_users = await crud.get_users(db)
-        if any(u.email == user.email for u in existing_users):
-            raise HTTPException(
-                status_code=400,
-                detail="Email already registered"
-            )
+        # Check if user already exists
+        from sqlalchemy import select
+        from src.models.models import User
         
-        return await crud.create_user(db, user)    
-    except Exception as e:
-        # Log the error (in a real app, use a proper logger)
-        print(f"Error during signup: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to signup"
+        result = await db.execute(
+            select(User).where(
+                (User.email == user.email) | (User.username == user.username)
+            )
         )
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            if existing_user.email == user.email:
+                raise HTTPException(status_code=400, detail="Email already registered")
+            else:
+                raise HTTPException(status_code=400, detail="Username already taken")
+        
+        return await crud.create_user(db, user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error during signup: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to signup")
