@@ -20,6 +20,7 @@ async def get_db():
 
 router = APIRouter()
 
+
 # Crear esquema
 @router.post("/", response_model=SchemaOut, status_code=status.HTTP_201_CREATED)
 async def create_new_schema(
