@@ -2,6 +2,7 @@ from typing import AsyncGenerator
 from .query_service import QueryService
 from .schema_service import SchemaService
 from .streaming_service import StreamingService
+from .intent_service import IntentAnalysisService
 
 
 class FinanceQueryOrchestrator:
@@ -11,20 +12,23 @@ class FinanceQueryOrchestrator:
         self, 
         query_service: QueryService,
         schema_service: SchemaService,
-        streaming_service: StreamingService
+        streaming_service: StreamingService,
+        intent_service: IntentAnalysisService = None
     ):
         self.query_service = query_service
         self.schema_service = schema_service
         self.streaming_service = streaming_service
+        self.intent_service = intent_service
     
     async def process_query(self, user_query: str) -> AsyncGenerator[str, None]:
-        """Procesa una consulta completa"""
+        """Procesa una consulta completa con soporte multi-tabla"""
         try:
-            # 1. Obtener esquema
-            schema = self.schema_service.get_table_schema()
+            # 1. Obtener esquemas relevantes usando análisis de intención
+            relevant_schemas = await self.schema_service.get_relevant_schemas(user_query, self.intent_service)
+            relationships = self.schema_service.get_table_relationships()
             
-            # 2. Generar SQL
-            sql = await self.query_service.generate_sql(user_query, schema)
+            # 2. Generar SQL con múltiples tablas
+            sql = await self.query_service.generate_sql(user_query, relevant_schemas, relationships)
             
             # Verificar si hubo error en generación SQL
             if "ERROR:" in sql:

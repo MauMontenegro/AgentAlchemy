@@ -9,6 +9,7 @@ from src.routers.signup import router as signup_router
 from src.routers.rag_agent import router as rag_agent_router
 from src.routers.contexts import router as context_router
 from src.routers.finanzas import router as finanzas_router
+from src.routers.esquemas import router as esquemas_router
 from src.models.models import Base
 from src.routers.auth_route import router as auth_router
 from src.services.db_connection import engine
@@ -23,7 +24,7 @@ async def lifespan(app:FastAPI):
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            print("Tablas de usuarios creadas o verificadas correctamente")
+            print("Tablas creadas o verificadas correctamente")
     except Exception as e:
             print(f"Error al crear las tablas de usuarios: {e}")
     yield
@@ -37,8 +38,9 @@ app.include_router(finanzas_router, prefix="/finanzas", tags=["Agents"])
 app.include_router(user_router,tags=["User"])
 app.include_router(auth_router,tags=["Auth"])
 app.include_router(signup_router, prefix="/signup",tags=["Sign-Up"])
-app.include_router(rag_agent_router, prefix="/ragagent", tags=["Agents"])
+app.include_router(rag_agent_router, prefix="/ragage,nt", tags=["Agents"])
 app.include_router(context_router,tags=["Context"])
+app.include_router(esquemas_router,prefix="/esquemas",tags=["Esquemas"])
 
 app.add_middleware(
     CORSMiddleware,

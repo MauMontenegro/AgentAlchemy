@@ -1,0 +1,82 @@
+[
+  {
+    "name": "id_Empresa",
+    "type": "integer",
+    "description": "Identificador numérico de la empresa"
+  },
+  {
+    "name": "id_Sucursal",
+    "type": "integer",
+    "description": "Identificador numérico de la sucursal"
+  },
+  {
+    "name": "id_Cliente",
+    "type": "integer",
+    "description": "Identificador numérico del cliente"
+  },
+  {
+    "name": "id_Conciliacion",
+    "type": "integer",
+    "description": "Identificador de la conciliación asociada al movimiento"
+  },
+  {
+    "name": "nb_Empresa",
+    "type": "string",
+    "description": "Nombre corto o identificador de la empresa"
+  },
+  {
+    "name": "nb_sucursal",
+    "type": "string",
+    "description": "Nombre de la sucursal"
+  },
+  {
+    "name": "de_RazonSocial",
+    "type": "string",
+    "description": "Razón social registrada del cliente"
+  },
+  {
+    "name": "fh_Envio",
+    "type": "datetime",
+    "description": "Fecha y hora de envío de la conciliación"
+  },
+  {
+    "name": "im_SaldoEdoCuenta",
+    "type": "number",
+    "description": "Saldo total en el estado de cuenta al momento del envío"
+  },
+  {
+    "name": "im_Movimiento",
+    "type": "number",
+    "description": "Monto individual del movimiento conciliado"
+  },
+  {
+    "name": "de_Estatus",
+    "type": "string",
+    "description": "Estatus de la conciliación (por ejemplo, APLICADO)"
+  },
+  {
+    "name": "nb_Moneda",
+    "type": "string",
+    "description": "Tipo de moneda utilizada (por ejemplo, Pesos MXN)"
+  },
+  {
+    "name": "nb_TipoDeNegocio",
+    "type": "string",
+    "description": "Tipo o clasificación del negocio (por ejemplo, Asociados)"
+  },
+  {
+    "name": "sn_Identificada",
+    "type": "string",
+    "description": "Indica si la conciliación fue identificada ('SI' o 'NO')"
+  },
+  {
+    "name": "sn_Contado",
+    "type": "string",
+    "description": "Indica si fue una operación de contado ('SI' o 'NO')"
+  },
+  {
+    "name": "sn_PagoFilial",
+    "type": "string",
+    "description": "Indica si el pago fue realizado por una filial ('SI' o 'NO')"
+  }
+]

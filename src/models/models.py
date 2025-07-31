@@ -41,4 +41,13 @@ class Document(Base):
     created_at = Column(DateTime(timezone=True), server_default=text("now()"))
 
     context = relationship("Context", back_populates="documents")
+
+class Esquema(Base):
+    __tablename__ = "esquema"
+    id = Column(Integer,primary_key=True,index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name=Column(String, nullable=False)
+    description=Column(Text, nullable=True)
+    schema_data=Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"))
         

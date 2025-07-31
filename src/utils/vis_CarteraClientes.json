@@ -1,0 +1,182 @@
+[
+  {
+    "name": "nu_Mes",
+    "type": "integer",
+    "description": "Número del mes correspondiente al documento"
+  },
+  {
+    "name": "Vendedor",
+    "type": "string",
+    "description": "Nombre completo del vendedor responsable"
+  },
+  {
+    "name": "id_Plaza",
+    "type": "integer",
+    "description": "Identificador de la plaza o región comercial"
+  },
+  {
+    "name": "id_Cliente",
+    "type": "integer",
+    "description": "Identificador numérico del cliente"
+  },
+  {
+    "name": "id_Empresa",
+    "type": "integer",
+    "description": "Identificador de la empresa emisora"
+  },
+  {
+    "name": "nb_Empresa",
+    "type": "string",
+    "description": "Nombre de la empresa emisora"
+  },
+  {
+    "name": "id_Estacion",
+    "type": "integer",
+    "description": "Identificador de la estación de servicio (si aplica)"
+  },
+  {
+    "name": "id_Remision",
+    "type": "string",
+    "description": "Identificador de la remisión asociada (puede estar vacío)"
+  },
+  {
+    "name": "id_Sucursal",
+    "type": "integer",
+    "description": "Identificador de la sucursal"
+  },
+  {
+    "name": "nb_Estacion",
+    "type": "string",
+    "description": "Nombre de la estación (si aplica)"
+  },
+  {
+    "name": "nb_Sucursal",
+    "type": "string",
+    "description": "Nombre de la sucursal"
+  },
+  {
+    "name": "fh_Documento",
+    "type": "datetime",
+    "description": "Fecha del documento emitido"
+  },
+  {
+    "name": "fl_Documento",
+    "type": "string",
+    "description": "Folio del documento"
+  },
+  {
+    "name": "id_Documento",
+    "type": "integer",
+    "description": "Identificador único del documento"
+  },
+  {
+    "name": "id_Ejercicio",
+    "type": "integer",
+    "description": "Ejercicio fiscal del documento (año)"
+  },
+  {
+    "name": "de_RazonSocial",
+    "type": "string",
+    "description": "Razón social del cliente"
+  },
+  {
+    "name": "id_DocumentoAnt",
+    "type": "string",
+    "description": "Identificador del documento anterior (si aplica)"
+  },
+  {
+    "name": "im_SaldoFactura",
+    "type": "number",
+    "description": "Saldo total pendiente de la factura"
+  },
+  {
+    "name": "im_SaldoVencido",
+    "type": "number",
+    "description": "Monto del saldo vencido"
+  },
+  {
+    "name": "im_SaldoVigente",
+    "type": "number",
+    "description": "Monto del saldo vigente (no vencido)"
+  },
+  {
+    "name": "nb_GrupoCliente",
+    "type": "string",
+    "description": "Nombre del grupo al que pertenece el cliente"
+  },
+  {
+    "name": "nu_DiasVencidos",
+    "type": "integer",
+    "description": "Número de días que lleva vencida la factura"
+  },
+  {
+    "name": "cl_TipoDocumento",
+    "type": "string",
+    "description": "Clasificación del tipo de documento (ej. NF = Nota de Factura)"
+  },
+  {
+    "name": "nb_TipoDeNegocio",
+    "type": "string",
+    "description": "Tipo de negocio o canal de venta (ej. GasPetroil)"
+  },
+  {
+    "name": "cl_TipoDocumentoAnt",
+    "type": "string",
+    "description": "Tipo de documento anterior (si aplica)"
+  },
+  {
+    "name": "fl_FacturaAnticipada",
+    "type": "string",
+    "description": "Indica si la factura fue anticipada"
+  },
+  {
+    "name": "nu_DiasTranscurridos",
+    "type": "integer",
+    "description": "Cantidad de días transcurridos desde la emisión del documento"
+  },
+  {
+    "name": "im_SaldoVencido_NDias",
+    "type": "number",
+    "description": "Saldo vencido con vencimiento menor a N días (personalizado)"
+  },
+  {
+    "name": "im_SaldoVencido_30Dias",
+    "type": "number",
+    "description": "Saldo vencido en el rango de hasta 30 días"
+  },
+  {
+    "name": "im_SaldoVencido_60Dias",
+    "type": "number",
+    "description": "Saldo vencido entre 31 y 60 días"
+  },
+  {
+    "name": "im_SaldoVencido_90Dias",
+    "type": "number",
+    "description": "Saldo vencido entre 61 y 90 días"
+  },
+  {
+    "name": "_airbyte_emitted_at",
+    "type": "datetime",
+    "description": "Marca de tiempo en que fue emitido el registro por Airbyte"
+  },
+  {
+    "name": "_airbyte_normalized_at",
+    "type": "datetime",
+    "description": "Marca de tiempo en que fue normalizado el registro por Airbyte"
+  },
+  {
+    "name": "fh_Vencimiento",
+    "type": "datetime",
+    "description": "Fecha de vencimiento de la factura"
+  },
+  {
+    "name": "fh_Registro",
+    "type": "datetime",
+    "description": "Fecha de registro del documento en el sistema"
+  },
+  {
+    "name": "nb_TipoFilial",
+    "type": "string",
+    "description": "Indica si la venta fue realizada por una filial"
+  }
+]

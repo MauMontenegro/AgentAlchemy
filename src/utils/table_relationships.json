@@ -1,0 +1,39 @@
+{
+    "tables": {
+        "Vis_Ventas": {
+            "full_name": "sipp-app.Tableros.Vis_Ventas",
+            "primary_keys": ["id_Cliente", "id_Empresa", "id_sucursal"],
+            "description": "Tabla principal de ventas con información detallada de transacciones"
+        },
+        "vis_CarteraClientes": {
+            "full_name": "sipp-app.Tableros.vis_CarteraClientes", 
+            "primary_keys": ["id_Cliente", "id_Documento"],
+            "description": "Información de cartera,deudas, y saldos pendientes por cliente"
+        },
+        "IngresosClientes": {
+            "full_name": "sipp-app.Tableros.IgresosClientes",
+            "primary_keys": ["id_Cliente", "id_Conciliacion"],
+            "description": "Información de movimientos y conciliaciones de pagos de clientes"
+        }
+    },
+    "relationships": [
+        {
+            "from_table": "Vis_Ventas",
+            "to_table": "vis_CarteraClientes",
+            "join_condition": "v.id_Cliente = c.id_Cliente AND v.id_Empresa = c.id_Empresa",
+            "relationship_type": "one_to_many"
+        },
+        {
+            "from_table": "Vis_Ventas", 
+            "to_table": "IngresosClientes",
+            "join_condition": "v.id_Cliente = i.id_Cliente AND v.id_Empresa = i.id_Empresa",
+            "relationship_type": "one_to_many"
+        },
+        {
+            "from_table": "vis_CarteraClientes",
+            "to_table": "IngresosClientes", 
+            "join_condition": "c.id_Cliente = i.id_Cliente AND c.id_Empresa = i.id_Empresa",
+            "relationship_type": "one_to_many"
+        }
+    ]
+}
