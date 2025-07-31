@@ -40,7 +40,7 @@ app.include_router(auth_router,tags=["Auth"])
 app.include_router(signup_router, prefix="/signup",tags=["Sign-Up"])
 app.include_router(rag_agent_router, prefix="/ragagent", tags=["Agents"])
 app.include_router(context_router,tags=["Context"])
-app.include_router(esquemas_router,tags=["Esquemas"])
+app.include_router(esquemas_router, prefix="/esquemas", tags=["Esquemas"])
 
 app.add_middleware(
     CORSMiddleware,
