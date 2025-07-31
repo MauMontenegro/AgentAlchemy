@@ -9,14 +9,7 @@ from src.routers.signup import router as signup_router
 from src.routers.rag_agent import router as rag_agent_router
 from src.routers.contexts import router as context_router
 from src.routers.finanzas import router as finanzas_router
-try:
-    from src.routers.esquemas import router as esquemas_router
-    ESQUEMAS_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: Could not import esquemas router: {e}")
-    ESQUEMAS_AVAILABLE = False
-    esquemas_router = None
-    
+from src.routers.esquemas import router as esquemas_router
 from src.models.models import Base
 from src.routers.auth_route import router as auth_router
 from src.services.db_connection import engine
@@ -47,11 +40,7 @@ app.include_router(auth_router,tags=["Auth"])
 app.include_router(signup_router, prefix="/signup",tags=["Sign-Up"])
 app.include_router(rag_agent_router, prefix="/ragagent", tags=["Agents"])
 app.include_router(context_router,tags=["Context"])
-if ESQUEMAS_AVAILABLE and esquemas_router:
-    app.include_router(esquemas_router, prefix="/esquemas", tags=["Esquemas"])
-    print("Esquemas router loaded successfully")
-else:
-    print("Esquemas router not available - skipping")
+app.include_router(esquemas_router, prefix="/esquemas", tags=["Esquemas"])
 
 app.add_middleware(
     CORSMiddleware,
