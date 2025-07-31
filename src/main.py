@@ -16,6 +16,7 @@ except ImportError as e:
     print(f"Warning: Could not import esquemas router: {e}")
     ESQUEMAS_AVAILABLE = False
     esquemas_router = None
+    
 from src.models.models import Base
 from src.routers.auth_route import router as auth_router
 from src.services.db_connection import engine
