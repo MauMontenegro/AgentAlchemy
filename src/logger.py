@@ -1,17 +1,33 @@
 import logging
+import sys
+from typing import Optional
+from .config import settings
 
-# Crear el logger y configurarlo
-logger = logging.getLogger("SAIP Logger")
-logger.setLevel(logging.DEBUG)
+def setup_logging(level: Optional[str] = None) -> None:
+    """Configure application logging"""
+    log_level = level or ("DEBUG" if settings.debug else "INFO")
+    
+    # Root logger configuration
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper()),
+        format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('logs/app.log', mode='a') if settings.debug else logging.NullHandler()
+        ]
+    )
+    
+    # Suppress noisy third-party loggers
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-# Formato
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+def get_logger(name: str) -> logging.Logger:
+    """Get a logger instance"""
+    return logging.getLogger(name)
 
-# Handler de consola
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
+# Initialize logging on import
+setup_logging()
 
-# Evitar duplicar handlers si ya existen
-if not logger.handlers:
-    logger.addHandler(console_handler)
+# Backward compatibility
+logger = get_logger("SAIP Logger")

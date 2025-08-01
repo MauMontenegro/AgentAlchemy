@@ -1,5 +1,5 @@
 import os
-import multiprocessing
+from multiprocessing import cpu_count
 import re
 import logging
 from datetime import datetime
@@ -10,7 +10,7 @@ from urllib.parse import quote_plus
 from dateutil import parser
 
 from dotenv import load_dotenv
-import feedparser
+from feedparser import parse as feedparser_parse
 from googlenewsdecoder import gnewsdecoder
 
 from bs4 import BeautifulSoup
@@ -92,7 +92,7 @@ def retrieve_articles_metadata(state: AgentState) -> AgentState:
         for url_index, url in enumerate(urls):
             try:
                 logging.debug(f"Parsing feed {url_index+1}/{len(urls)}: {url}")
-                feed = feedparser.parse(url)
+                feed = feedparser_parse(url)
                 
                 # Check if parsing was successful
                 if getattr(feed, 'bozo', False) and feed.get('bozo_exception'):
@@ -179,7 +179,7 @@ def retrieve_articles_text(state: AgentState) -> AgentState:
     
     # Get concurrency from environment variable or calculate based on CPU cores
     MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS",
-    min(32, multiprocessing.cpu_count() * 4)  # Default: 4x CPU cores, max 32
+    min(32, cpu_count() * 4)  # Default: 4x CPU cores, max 32
     ))
     
     articles_metadata = state["articles_metadata"]
@@ -241,7 +241,9 @@ def scrape_article(article):
                 "date": article["pubDate"]
             }, real_url
     except Exception as e:
-        print(f"Error fetching {article['link']}: {e}")
+        # Sanitize article link to prevent log injection
+        safe_link = re.sub(r'[\r\n\t\x00-\x1f\x7f-\x9f]', '', str(article.get('link', 'unknown')))
+        print(f"Error fetching {safe_link}: {e}")
     
     return None, None
 

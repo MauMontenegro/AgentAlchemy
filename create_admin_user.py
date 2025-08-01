@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Script para crear un usuario admin inicial en Aurora RDS
+Script para crear un usuario admin inicial
 """
-import asyncio
+from asyncio import run as asyncio_run
 import os
 from dotenv import load_dotenv
 from passlib.context import CryptContext
@@ -18,9 +18,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 async def create_admin_user():
     """Crear usuario admin inicial"""
-    username = "maumont92"
-    email = "m.montenegro.meza@gmail.com"
-    password = "1492plcaz!"  # Cambiar después del primer login
+    username = os.getenv("ADMIN_USER")
+    email = os.getenv("ADMIN_EMAIL")
+    password = os.getenv("ADMIN_PASSWORD")
     
     async with AsyncSessionLocal() as db:
         try:
@@ -45,16 +45,10 @@ async def create_admin_user():
             
             db.add(admin_user)
             await db.commit()
-            await db.refresh(admin_user)
-            
-            print(f"✅ Usuario admin creado:")
-            print(f"   Username: {username}")
-            print(f"   Password: {password}")
-            print(f"   Email: {email}")
-            
+            await db.refresh(admin_user)            
         except Exception as e:
             await db.rollback()
             print(f"❌ Error: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(create_admin_user())
+    asyncio_run(create_admin_user())

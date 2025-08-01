@@ -15,7 +15,6 @@ DB_NAME = os.getenv('DB_NAME')
 encoded_password = quote_plus(DB_PASSWORD)
 
 db_url = f"postgresql+asyncpg://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-print("DB URL:", db_url)
 
 engine = create_async_engine(db_url, echo=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)

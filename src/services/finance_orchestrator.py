@@ -37,7 +37,15 @@ class FinanceQueryOrchestrator:
                 return
             
             # 3. Ejecutar query
-            results = await self.query_service.execute_query(sql)
+            try:
+                results = await self.query_service.execute_query(sql)
+            except Exception as e:
+                # Handle any BigQuery or SQL errors
+                error_msg = "Lo siento, hubo un problema con la consulta. Por favor, intenta reformular tu pregunta de manera diferente."
+                print(f"[ORCHESTRATOR] Caught error during query execution: {str(e)}")
+                async for chunk in self.streaming_service.stream_error(error_msg):
+                    yield chunk
+                return
             
             # 4. Generar respuesta
             response = await self.query_service.generate_response(user_query, sql, results)

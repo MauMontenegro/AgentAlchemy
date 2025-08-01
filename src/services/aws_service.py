@@ -1,15 +1,11 @@
 import json
 from fastapi.responses import StreamingResponse
-import asyncio
 from langchain_aws import ChatBedrockConverse
 import os
 import dotenv
-
 from dotenv import load_dotenv
 
 load_dotenv()
-
-
 
 async def chat_bedrock(query: str):
     """Call bedrock model and answer user query"""
@@ -32,7 +28,7 @@ async def chat_bedrock(query: str):
             chunk_size = 10  # Adjust chunk size as needed
             for i in range(0, len(response.content), chunk_size):
                 chunk = response.content[i:i + chunk_size]
-                # Format as SSE
+                # Format as SSE 
                 data = json.dumps({"content": chunk})
                 yield f"data: {data}\n\n"
         

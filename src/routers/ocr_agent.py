@@ -1,4 +1,4 @@
-import asyncio
+from asyncio import as_completed 
 import json
 from datetime import date
 from functools import lru_cache
@@ -184,7 +184,7 @@ async def extract_text(
                 for file in file_data
             ]
             
-            for future in asyncio.as_completed(tasks):
+            for future in as_completed(tasks):
                 try:
                     result = await future
                     yield json.dumps(result) + "\n"

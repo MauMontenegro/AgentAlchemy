@@ -24,6 +24,8 @@ def scrap_article(state:ScraperAgentState):
                 # Extract title
                 title_tag = soup.find('title')
                 title = title_tag.get_text(strip=True) if title_tag else "No title found"
+                # Sanitize title to prevent injection
+                title = title.replace('\x00', '').replace('\r', '').replace('\n', ' ')[:500]
 
                 # Try to find main content in article or similar tags
                 article = soup.find('article')
