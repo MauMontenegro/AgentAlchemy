@@ -56,8 +56,8 @@
   },
   {
     "name": "fh_Documento",
-    "type": "datetime",
-    "description": "Fecha del documento emitido"
+    "type": "string",
+    "description": "Fecha del documento emitido (formato string, usar PARSE_DATETIME o LIKE para filtros de fecha)"
   },
   {
     "name": "fl_Documento",

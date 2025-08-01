@@ -36,21 +36,35 @@ class FinanceQueryOrchestrator:
                     yield chunk
                 return
             
-            # 3. Ejecutar query
+            # 3. Corregir EXTRACT en campos string de fecha
+            sql = self._fix_date_extracts(sql)
+            
+            # 4. Ejecutar query
             try:
                 results = await self.query_service.execute_query(sql)
             except Exception as e:
-                # Handle any BigQuery or SQL errors
-                error_msg = "Lo siento, hubo un problema con la consulta. Por favor, intenta reformular tu pregunta de manera diferente."
-                print(f"[ORCHESTRATOR] Caught error during query execution: {str(e)}")
+                # Handle any BigQuery or SQL errors with specific details
+                error_details = str(e)
+                print(f"[ORCHESTRATOR] Caught error during query execution: {error_details}")
+                
+                # Extract meaningful error message for user
+                if "not found" in error_details.lower():
+                    error_msg = f"Error en la consulta: {error_details}. Por favor, verifica los nombres de las columnas o tablas."
+                elif "extract" in error_details.lower() and "string" in error_details.lower():
+                    error_msg = "Error: Las fechas están almacenadas como texto. La consulta necesita ser reformulada para trabajar con fechas en formato string."
+                elif "invalid" in error_details.lower():
+                    error_msg = f"Consulta inválida: {error_details}. Por favor, reformula tu pregunta."
+                else:
+                    error_msg = f"Error en la base de datos: {error_details}"
+                
                 async for chunk in self.streaming_service.stream_error(error_msg):
                     yield chunk
                 return
             
-            # 4. Generar respuesta
+            # 5. Generar respuesta
             response = await self.query_service.generate_response(user_query, sql, results)
             
-            # 5. Stream completo
+            # 6. Stream completo
             async for chunk in self.streaming_service.stream_query_process(
                 user_query, sql, results, response
             ):
@@ -59,3 +73,48 @@ class FinanceQueryOrchestrator:
         except Exception as e:
             async for chunk in self.streaming_service.stream_error(str(e)):
                 yield chunk
+    
+    def _fix_date_extracts(self, sql: str) -> str:
+        """Convierte funciones de fecha en campos string a formato válido"""
+        import re
+        
+        # Campos de fecha que son string
+        date_fields = ['fh_Documento', 'fh_Vencimiento', 'fh_Registro']
+        
+        for field in date_fields:
+            # EXTRACT(MONTH FROM field) -> CAST(SUBSTR(field, 6, 2) AS INT64)
+            sql = re.sub(
+                rf'EXTRACT\(MONTH FROM {field}\)',
+                f'CAST(SUBSTR({field}, 6, 2) AS INT64)',
+                sql, flags=re.IGNORECASE
+            )
+            
+            # EXTRACT(YEAR FROM field) -> CAST(SUBSTR(field, 1, 4) AS INT64)
+            sql = re.sub(
+                rf'EXTRACT\(YEAR FROM {field}\)',
+                f'CAST(SUBSTR({field}, 1, 4) AS INT64)',
+                sql, flags=re.IGNORECASE
+            )
+            
+            # Reemplazar PARSE_DATETIME con formato y campo
+            sql = re.sub(
+                rf'PARSE_DATETIME\([^,]+,\s*{field}\)',
+                f'DATE(COALESCE(SAFE.PARSE_TIMESTAMP(\'%Y-%m-%dT%H:%M:%E*S\', {field}), SAFE.PARSE_TIMESTAMP(\'%Y-%m-%d %H:%M:%E*S\', {field})))',
+                sql, flags=re.IGNORECASE
+            )
+            
+            # También manejar con alias de tabla
+            sql = re.sub(
+                rf'PARSE_DATETIME\([^,]+,\s*c\.{field}\)',
+                f'DATE(COALESCE(SAFE.PARSE_TIMESTAMP(\'%Y-%m-%dT%H:%M:%E*S\', c.{field}), SAFE.PARSE_TIMESTAMP(\'%Y-%m-%d %H:%M:%E*S\', c.{field})))',
+                sql, flags=re.IGNORECASE
+            )
+            
+            # EXTRACT anidado con PARSE_DATETIME
+            sql = re.sub(
+                rf'EXTRACT\((MONTH|YEAR) FROM PARSE_DATETIME\({field}[^)]+\)\)',
+                lambda m: f'CAST(SUBSTR({field}, {"6, 2" if m.group(1).upper() == "MONTH" else "1, 4"}) AS INT64)',
+                sql, flags=re.IGNORECASE
+            )
+        
+        return sql

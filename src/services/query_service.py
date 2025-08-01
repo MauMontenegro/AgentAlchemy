@@ -94,6 +94,8 @@ class BigQueryService(QueryService):
         - Si no puedes generar una consulta SQL válida, responde "ERROR: No puedo convertir esta pregunta a SQL"
         - Limita los resultados a un máximo de 100 filas usando LIMIT 100
         - USA EXACTAMENTE los nombres de tabla especificados en las relaciones
+        - USA SOLO los nombres de campos que aparecen en los esquemas proporcionados
+        - NO inventes nombres de campos, usa únicamente los listados en cada tabla
         - La fecha actual es: {fecha}
         
         TABLAS DISPONIBLES:
@@ -104,10 +106,13 @@ class BigQueryService(QueryService):
         
         INSTRUCCIONES OBLIGATORIAS:
         - USA EXACTAMENTE los nombres de tabla mostrados en las relaciones
+        - USA SOLO los nombres de campos listados en los esquemas de arriba
+        - NO uses campos que no estén en la lista de esquemas
         - Para IngresosClientes usa: `sipp-app.Tableros.IgresosClientes`
         - Para vis_CarteraClientes usa: `sipp-app.Tableros.vis_CarteraClientes`
         - Para Vis_Ventas usa: `sipp-app.Tableros.Vis_Ventas`
         - Usa aliases: v, c, i respectivamente
+        - VALIDA que cada campo usado existe en el esquema correspondiente
 
         Pregunta del usuario: {query}
         
