@@ -17,27 +17,46 @@ class StreamingService:
         response: str
     ) -> AsyncGenerator[str, None]:
         """Stream del proceso completo de query"""
+        print(f"[STREAMING] Starting stream_query_process with response length: {len(response)}")
+        print(f"[STREAMING] Results count: {len(results)}")
         
         # Step 1: SQL Generation
-        yield self._format_step('generating_sql', 'Convirtiendo pregunta a SQL...')
+        step1 = self._format_step('generating_sql', 'Convirtiendo pregunta a SQL...')
+        print(f"[STREAMING] Step 1: {step1[:100]}...")
+        yield step1
         
         # Step 2: Query Execution  
-        yield self._format_step('executing_query', 'Ejecutando consulta SQL...', sql)
+        step2 = self._format_step('executing_query', 'Ejecutando consulta SQL...', sql)
+        print(f"[STREAMING] Step 2: {step2[:100]}...")
+        yield step2
         
         # Step 3: Response Generation
-        yield self._format_step('generating_response', 'Generando respuesta...')
+        step3 = self._format_step('generating_response', 'Generando respuesta...')
+        print(f"[STREAMING] Step 3: {step3[:100]}...")
+        yield step3
         
         # Step 4: Stream response content
+        print(f"[STREAMING] About to stream content: {response[:100]}...")
+        chunk_count = 0
         async for chunk in self._stream_content(response):
+            chunk_count += 1
+            print(f"[STREAMING] Content chunk {chunk_count}: {chunk[:50]}...")
             yield chunk
+        print(f"[STREAMING] Streamed {chunk_count} content chunks")
         
-        # Final data
-        yield self._format_data({
-            'raw_data': results, 
+        # Final data with cleaned results
+        cleaned_results = self._clean_results_for_streaming(results)
+        final_data = self._format_data({
+            'raw_data': cleaned_results, 
             'sql_query': sql, 
             'row_count': len(results)
         })
-        yield "data: [DONE]\n\n"
+        print(f"[STREAMING] Final data: {final_data[:100]}...")
+        yield final_data
+        
+        done_msg = "data: [DONE]\n\n"
+        print(f"[STREAMING] Done message: {done_msg}")
+        yield done_msg
     
     async def stream_error(self, error: str) -> AsyncGenerator[str, None]:
         """Stream de errores"""
@@ -71,3 +90,20 @@ class StreamingService:
         elif "Permission denied" in error:
             return "No tienes permisos para acceder a los datos solicitados."
         return f"Error ejecutando la consulta: {error}"
+    
+    def _clean_results_for_streaming(self, results: List[Dict]) -> List[Dict]:
+        """Limpia los resultados para el streaming al frontend"""
+        import datetime
+        
+        cleaned = []
+        for result in results:
+            clean_result = {}
+            for key, value in result.items():
+                if isinstance(value, (datetime.datetime, datetime.date)):
+                    clean_result[key] = str(value)
+                elif value is None:
+                    clean_result[key] = None
+                else:
+                    clean_result[key] = value
+            cleaned.append(clean_result)
+        return cleaned

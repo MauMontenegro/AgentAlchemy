@@ -73,16 +73,37 @@ class BigQueryService(QueryService):
             raise
     
     async def generate_response(self, query: str, sql: str, results: List[Dict]) -> str:
+        print(f"[RESPONSE GENERATION] Starting response generation")
+        print(f"[RESPONSE GENERATION] Query: {query}")
+        print(f"[RESPONSE GENERATION] Results count: {len(results)}")
+        
+        # Limpiar y simplificar resultados para evitar problemas con datetime y objetos complejos
+        cleaned_results = self._clean_results_for_llm(results)
+        print(f"[RESPONSE GENERATION] Cleaned results: {cleaned_results[:500]}...")
+        
         template = self._get_response_template()
-        response = await self.llm_client.ainvoke(
-            template.format(
-                original_query=query,
-                sql_query=sql,
-                results=json.dumps(results[:10], indent=2) if results else "Sin resultados",
-                row_count=len(results)
-            )
+        formatted_results = json.dumps(cleaned_results[:5], indent=2, ensure_ascii=False) if cleaned_results else "Sin resultados"
+        
+        prompt = template.format(
+            original_query=query,
+            sql_query=sql,
+            results=formatted_results,
+            row_count=len(results)
         )
-        return response.content
+        
+        print(f"[RESPONSE GENERATION] Prompt length: {len(prompt)}")
+        print(f"[RESPONSE GENERATION] Calling LLM for response...")
+        
+        try:
+            response = await self.llm_client.ainvoke(prompt)
+            print(f"[RESPONSE GENERATION] LLM response received")
+            print(f"[RESPONSE GENERATION] Response content: {response.content[:200]}...")
+            print(f"[RESPONSE GENERATION] Response length: {len(response.content)}")
+            return response.content
+        except Exception as e:
+            print(f"[RESPONSE GENERATION] Error calling LLM: {str(e)}")
+            # Fallback response
+            return self._create_fallback_response(query, results)
     
     def _get_multi_table_sql_template(self) -> str:
         return """
@@ -92,7 +113,7 @@ class BigQueryService(QueryService):
         - Solo devuelve la consulta SQL, sin explicaciones adicionales
         - Usa sintaxis válida de BigQuery
         - Si no puedes generar una consulta SQL válida, responde "ERROR: No puedo convertir esta pregunta a SQL"
-        - Limita los resultados a un máximo de 100 filas usando LIMIT 100
+        - Limita los resultados a un máximo de 20 filas usando LIMIT 20
         - USA EXACTAMENTE los nombres de tabla especificados en las relaciones
         - USA SOLO los nombres de campos que aparecen en los esquemas proporcionados
         - NO inventes nombres de campos, usa únicamente los listados en cada tabla
@@ -168,3 +189,38 @@ class BigQueryService(QueryService):
         elif sql.startswith('```'):
             sql = sql.replace('```', '').strip()
         return sql
+    
+    def _clean_results_for_llm(self, results: List[Dict]) -> List[Dict]:
+        """Limpia los resultados para evitar problemas con el LLM"""
+        import datetime
+        
+        cleaned = []
+        for result in results:
+            clean_result = {}
+            for key, value in result.items():
+                if isinstance(value, (datetime.datetime, datetime.date)):
+                    clean_result[key] = str(value)
+                elif value is None:
+                    clean_result[key] = "N/A"
+                elif isinstance(value, (int, float, str, bool)):
+                    clean_result[key] = value
+                else:
+                    clean_result[key] = str(value)
+            cleaned.append(clean_result)
+        return cleaned
+    
+    def _create_fallback_response(self, query: str, results: List[Dict]) -> str:
+        """Crea una respuesta de fallback cuando el LLM falla"""
+        if not results:
+            return "No se encontraron resultados para tu consulta."
+        
+        result = results[0]
+        response_parts = [f"Encontré {len(results)} resultado(s) para tu consulta: '{query}'"]
+        
+        # Extraer campos más relevantes
+        key_fields = ['nb_Cliente', 'im_Total', 'nb_Producto', 'fh_movimiento', 'de_Estatus']
+        for field in key_fields:
+            if field in result and result[field] is not None:
+                response_parts.append(f"- {field}: {result[field]}")
+        
+        return "\n".join(response_parts)

@@ -62,13 +62,20 @@ class FinanceQueryOrchestrator:
                 return
             
             # 5. Generar respuesta
+            print(f"[ORCHESTRATOR] About to generate response with {len(results)} results")
+            print(f"[ORCHESTRATOR] First result sample: {results[0] if results else 'No results'}")
+            
             response = await self.query_service.generate_response(user_query, sql, results)
+            print(f"[ORCHESTRATOR] Generated response: {response[:200]}...")
             
             # 6. Stream completo
+            print(f"[ORCHESTRATOR] Starting streaming process")
             async for chunk in self.streaming_service.stream_query_process(
                 user_query, sql, results, response
             ):
+                print(f"[ORCHESTRATOR] Yielding chunk: {chunk[:100]}...")
                 yield chunk
+            print(f"[ORCHESTRATOR] Streaming completed")
                 
         except Exception as e:
             async for chunk in self.streaming_service.stream_error(str(e)):
