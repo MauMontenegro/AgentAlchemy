@@ -222,8 +222,18 @@ async def extract_text(
     
     def safe_json_dumps(obj):
         """Safely serialize object to JSON string."""
+        def sanitize_obj(item):
+            if isinstance(item, dict):
+                return {k: sanitize_obj(v) for k, v in item.items()}
+            elif isinstance(item, list):
+                return [sanitize_obj(v) for v in item]
+            elif isinstance(item, str):
+                return item.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').replace('"', '\"')
+            return item
+        
         try:
-            return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
+            sanitized = sanitize_obj(obj)
+            return json.dumps(sanitized, ensure_ascii=False, separators=(',', ':'))
         except (TypeError, ValueError) as e:
             logger.error(f"JSON serialization error: {e}")
             return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=False)
