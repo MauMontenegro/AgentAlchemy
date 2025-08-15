@@ -177,8 +177,9 @@ async def extract_text(
         if not isinstance(schema_dict, dict):
             raise ValueError("Schema must be a JSON object")
     except (json.JSONDecodeError, ValueError) as e:
+        error_msg = safe_json_dumps({"error": f"Invalid schema: {str(e)}"})
         return StreamingResponse(
-            iter([safe_json_dumps({"error": f"Invalid schema: {str(e)}"}) + "\n"]),
+            iter([error_msg + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -189,8 +190,9 @@ async def extract_text(
         DynamicSchema = get_cached_dynamic_model(schema_key)
     except Exception as e:
         logger.exception("Failed to create dynamic model from schema")
+        error_msg = safe_json_dumps({"error": f"Invalid schema format: {str(e)}"})
         return StreamingResponse(
-            iter([safe_json_dumps({"error": f"Invalid schema format: {str(e)}"}) + "\n"]),
+            iter([error_msg + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -222,56 +224,83 @@ async def extract_text(
     
     def safe_json_dumps(obj):
         """Safely serialize object to JSON string."""
+        def clean_string(s):
+            if not isinstance(s, str):
+                return s
+            # Remove control characters and escape quotes
+            import re
+            s = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', s)
+            s = s.replace('\\', '\\\\').replace('"', '\\"')
+            return s.strip()
+        
         def sanitize_obj(item):
             if isinstance(item, dict):
-                return {k: sanitize_obj(v) for k, v in item.items()}
+                return {str(k): sanitize_obj(v) for k, v in item.items()}
             elif isinstance(item, list):
                 return [sanitize_obj(v) for v in item]
             elif isinstance(item, str):
-                return item.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').replace('"', '\"')
-            return item
+                return clean_string(item)
+            elif item is None:
+                return None
+            else:
+                return str(item)
         
         try:
             sanitized = sanitize_obj(obj)
-            return json.dumps(sanitized, ensure_ascii=False, separators=(',', ':'))
-        except (TypeError, ValueError) as e:
+            return json.dumps(sanitized, ensure_ascii=False)
+        except Exception as e:
             logger.error(f"JSON serialization error: {e}")
-            return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=False)
+            return json.dumps({"error": "Serialization failed"}, ensure_ascii=False)
 
     # Stream results as they complete
     async def stream_results():
-        # First yield any file reading errors
-        for error in error_responses:
-            yield safe_json_dumps(error) + "\n"
-            
-        # Then process the files that were read successfully
-        if file_data:
-            if batch_mode:
-                # Process all files as one document
-                try:
-                    result = await process_batch_files(file_data, DynamicSchema, agent)
-                    yield safe_json_dumps(result) + "\n"
-                except Exception as e:
-                    logger.exception("Error in batch processing")
-                    yield safe_json_dumps({
-                        "error": f"Batch processing failed: {str(e)}"
-                    }) + "\n"
-            else:
-                # Process files individually
-                tasks = [
-                    process_single_file(file, DynamicSchema, agent)
-                    for file in file_data
-                ]
+        try:
+            # First yield any file reading errors
+            for error in error_responses:
+                json_line = safe_json_dumps(error)
+                if json_line:
+                    yield json_line + "\n"
                 
-                for future in as_completed(tasks):
+            # Then process the files that were read successfully
+            if file_data:
+                if batch_mode:
+                    # Process all files as one document
                     try:
-                        result = await future
-                        yield safe_json_dumps(result) + "\n"
+                        result = await process_batch_files(file_data, DynamicSchema, agent)
+                        json_line = safe_json_dumps(result)
+                        if json_line:
+                            yield json_line + "\n"
                     except Exception as e:
-                        logger.exception("Unexpected error in result streaming")
-                        yield safe_json_dumps({
-                            "error": f"Unexpected error: {str(e)}"
-                        }) + "\n"
+                        logger.exception("Error in batch processing")
+                        error_result = {"error": f"Batch processing failed: {str(e)}"}
+                        json_line = safe_json_dumps(error_result)
+                        if json_line:
+                            yield json_line + "\n"
+                else:
+                    # Process files individually
+                    tasks = [
+                        process_single_file(file, DynamicSchema, agent)
+                        for file in file_data
+                    ]
+                    
+                    for future in as_completed(tasks):
+                        try:
+                            result = await future
+                            json_line = safe_json_dumps(result)
+                            if json_line:
+                                yield json_line + "\n"
+                        except Exception as e:
+                            logger.exception("Unexpected error in result streaming")
+                            error_result = {"error": f"Unexpected error: {str(e)}"}
+                            json_line = safe_json_dumps(error_result)
+                            if json_line:
+                                yield json_line + "\n"
+        except Exception as e:
+            logger.exception("Critical error in stream_results")
+            final_error = {"error": "Stream processing failed"}
+            json_line = safe_json_dumps(final_error)
+            if json_line:
+                yield json_line + "\n"
 
     # Create and return the streaming response
     return StreamingResponse(
