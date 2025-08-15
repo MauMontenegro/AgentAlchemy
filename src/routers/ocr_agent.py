@@ -178,7 +178,7 @@ async def extract_text(
             raise ValueError("Schema must be a JSON object")
     except (json.JSONDecodeError, ValueError) as e:
         return StreamingResponse(
-            iter([json.dumps({"error": f"Invalid schema: {str(e)}"}) + "\n"]),
+            iter([json.dumps({"error": f"Invalid schema: {str(e)}"}, ensure_ascii=False) + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -190,7 +190,7 @@ async def extract_text(
     except Exception as e:
         logger.exception("Failed to create dynamic model from schema")
         return StreamingResponse(
-            iter([json.dumps({"error": f"Invalid schema format: {str(e)}"}) + "\n"]),
+            iter([json.dumps({"error": f"Invalid schema format: {str(e)}"}, ensure_ascii=False) + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -224,7 +224,7 @@ async def extract_text(
     async def stream_results():
         # First yield any file reading errors
         for error in error_responses:
-            yield json.dumps(error) + "\n"
+            yield json.dumps(error, ensure_ascii=False) + "\n"
             
         # Then process the files that were read successfully
         if file_data:
@@ -232,12 +232,12 @@ async def extract_text(
                 # Process all files as one document
                 try:
                     result = await process_batch_files(file_data, DynamicSchema, agent)
-                    yield json.dumps(result) + "\n"
+                    yield json.dumps(result, ensure_ascii=False) + "\n"
                 except Exception as e:
                     logger.exception("Error in batch processing")
                     yield json.dumps({
                         "error": f"Batch processing failed: {str(e)}"
-                    }) + "\n"
+                    }, ensure_ascii=False) + "\n"
             else:
                 # Process files individually
                 tasks = [
@@ -248,12 +248,12 @@ async def extract_text(
                 for future in as_completed(tasks):
                     try:
                         result = await future
-                        yield json.dumps(result) + "\n"
+                        yield json.dumps(result, ensure_ascii=False) + "\n"
                     except Exception as e:
                         logger.exception("Unexpected error in result streaming")
                         yield json.dumps({
                             "error": f"Unexpected error: {str(e)}"
-                        }) + "\n"
+                        }, ensure_ascii=False) + "\n"
 
     # Create and return the streaming response
     return StreamingResponse(
