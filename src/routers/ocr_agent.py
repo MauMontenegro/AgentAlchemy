@@ -177,9 +177,8 @@ async def extract_text(
         if not isinstance(schema_dict, dict):
             raise ValueError("Schema must be a JSON object")
     except (json.JSONDecodeError, ValueError) as e:
-        error_msg = safe_json_dumps({"error": f"Invalid schema: {str(e)}"})
         return StreamingResponse(
-            iter([error_msg + "\n"]),
+            iter([json.dumps({"error": f"Invalid schema: {str(e)}"}) + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -190,9 +189,8 @@ async def extract_text(
         DynamicSchema = get_cached_dynamic_model(schema_key)
     except Exception as e:
         logger.exception("Failed to create dynamic model from schema")
-        error_msg = safe_json_dumps({"error": f"Invalid schema format: {str(e)}"})
         return StreamingResponse(
-            iter([error_msg + "\n"]),
+            iter([json.dumps({"error": f"Invalid schema format: {str(e)}"}) + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -224,33 +222,11 @@ async def extract_text(
     
     def safe_json_dumps(obj):
         """Safely serialize object to JSON string."""
-        def clean_string(s):
-            if not isinstance(s, str):
-                return s
-            # Remove control characters and escape quotes
-            import re
-            s = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', s)
-            s = s.replace('\\', '\\\\').replace('"', '\\"')
-            return s.strip()
-        
-        def sanitize_obj(item):
-            if isinstance(item, dict):
-                return {str(k): sanitize_obj(v) for k, v in item.items()}
-            elif isinstance(item, list):
-                return [sanitize_obj(v) for v in item]
-            elif isinstance(item, str):
-                return clean_string(item)
-            elif item is None:
-                return None
-            else:
-                return str(item)
-        
         try:
-            sanitized = sanitize_obj(obj)
-            return json.dumps(sanitized, ensure_ascii=False)
+            return json.dumps(obj, ensure_ascii=False)
         except Exception as e:
             logger.error(f"JSON serialization error: {e}")
-            return json.dumps({"error": "Serialization failed"}, ensure_ascii=False)
+            return json.dumps({"error": "Serialization failed"})
 
     # Stream results as they complete
     async def stream_results():
@@ -302,7 +278,6 @@ async def extract_text(
             if json_line:
                 yield json_line + "\n"
 
-    # Create and return the streaming response
     return StreamingResponse(
         stream_results(),
         media_type="application/x-ndjson"
