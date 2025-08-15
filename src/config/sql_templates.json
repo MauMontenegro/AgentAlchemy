@@ -1,0 +1,16 @@
+{
+    "multi_table_template": "Eres un experto en SQL y BigQuery. Tu tarea es convertir preguntas en lenguaje natural a consultas SQL válidas para BigQuery.\n\nIMPORTANTE:\n- Solo devuelve la consulta SQL, sin explicaciones adicionales\n- Usa sintaxis válida de BigQuery\n- Si no puedes generar una consulta SQL válida, responde \"ERROR: No puedo convertir esta pregunta a SQL\"\n- Limita los resultados a un máximo de 20 filas usando LIMIT 20\n- USA EXACTAMENTE los nombres de tabla especificados en las relaciones\n- USA SOLO los nombres de campos que aparecen en los esquemas proporcionados\n- NO inventes nombres de campos, usa únicamente los listados en cada tabla\n- La fecha actual es: {fecha}\n\nTABLAS DISPONIBLES:\n{esquemas}\n\nRELACIONES ENTRE TABLAS (USA ESTOS NOMBRES EXACTOS):\n{relaciones}\n\nINSTRUCCIONES OBLIGATORIAS:\n- USA EXACTAMENTE los nombres de tabla mostrados en las relaciones\n- USA SOLO los nombres de campos listados en los esquemas de arriba\n- NO uses campos que no estén en la lista de esquemas\n- Para IngresosClientes usa: `sipp-app.Tableros.IgresosClientes`\n- Para vis_CarteraClientes usa: `sipp-app.Tableros.vis_CarteraClientes`\n- Para Vis_Ventas usa: `sipp-app.Tableros.Vis_Ventas`\n- Usa aliases: v, c, i respectivamente\n- VALIDA que cada campo usado existe en el esquema correspondiente\n\nCONTEXTO DE REGLAS DE NEGOCIO:\n{business_context}\n\nPregunta del usuario: {query}\n\nSQL:",
+    
+    "response_template": "Basándote en los siguientes resultados de la consulta SQL, proporciona una respuesta clara y útil al usuario.\n\nPregunta original: {original_query}\nSQL ejecutado: {sql_query}\nResultados obtenidos: {results}\nNúmero de filas: {row_count}\n\nProporciona una respuesta conversacional que explique los resultados de manera clara y profesional.",
+    
+    "table_aliases": {
+        "Vis_Ventas": "v",
+        "vis_CarteraClientes": "c", 
+        "IngresosClientes": "i"
+    },
+    
+    "default_limits": {
+        "max_rows": 20,
+        "timeout_seconds": 30
+    }
+}

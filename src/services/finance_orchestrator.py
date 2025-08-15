@@ -3,6 +3,7 @@ from .query_service import QueryService
 from .schema_service import SchemaService
 from .streaming_service import StreamingService
 from .intent_service import IntentAnalysisService
+from .business_rules_service import BusinessRulesService
 
 
 class FinanceQueryOrchestrator:
@@ -13,22 +14,41 @@ class FinanceQueryOrchestrator:
         query_service: QueryService,
         schema_service: SchemaService,
         streaming_service: StreamingService,
-        intent_service: IntentAnalysisService = None
+        intent_service: IntentAnalysisService = None,
+        business_rules_service: BusinessRulesService = None
     ):
         self.query_service = query_service
         self.schema_service = schema_service
         self.streaming_service = streaming_service
         self.intent_service = intent_service
+        self.business_rules_service = business_rules_service or BusinessRulesService()
     
     async def process_query(self, user_query: str) -> AsyncGenerator[str, None]:
         """Procesa una consulta completa con soporte multi-tabla"""
         try:
-            # 1. Obtener esquemas relevantes usando análisis de intención
-            relevant_schemas = await self.schema_service.get_relevant_schemas(user_query, self.intent_service)
+            # 1. Aplicar reglas de negocio
+            business_rules_result = self.business_rules_service.apply_business_rules(user_query)
+            processed_query = business_rules_result["transformed_query"]
+            business_context = self.business_rules_service.get_business_context(business_rules_result)
+            
+            # 2. Obtener esquemas relevantes usando análisis de intención
+            relevant_schemas = await self.schema_service.get_relevant_schemas(processed_query, self.intent_service)
             relationships = self.schema_service.get_table_relationships()
             
-            # 2. Generar SQL con múltiples tablas
-            sql = await self.query_service.generate_sql(user_query, relevant_schemas, relationships)
+            # 3. Generar SQL con múltiples tablas y reglas de negocio
+            sql = await self.query_service.generate_sql(
+                processed_query, 
+                relevant_schemas, 
+                relationships,
+                business_context
+            )
+            
+            # Aplicar filtros SQL de reglas de negocio
+            business_filters = self.business_rules_service.get_sql_filters(business_rules_result)
+            if business_filters and "WHERE" in sql:
+                sql = sql.replace("WHERE", f"WHERE 1=1 {business_filters} AND")
+            elif business_filters:
+                sql = sql.rstrip(';') + f" WHERE 1=1 {business_filters};"
             
             # Verificar si hubo error en generación SQL
             if "ERROR:" in sql:
@@ -36,10 +56,10 @@ class FinanceQueryOrchestrator:
                     yield chunk
                 return
             
-            # 3. Corregir EXTRACT en campos string de fecha
+            # 4. Corregir EXTRACT en campos string de fecha
             sql = self._fix_date_extracts(sql)
             
-            # 4. Ejecutar query
+            # 5. Ejecutar query
             try:
                 results = await self.query_service.execute_query(sql)
             except Exception as e:
@@ -61,25 +81,43 @@ class FinanceQueryOrchestrator:
                     yield chunk
                 return
             
-            # 5. Generar respuesta
+            # 6. Generar respuesta
             print(f"[ORCHESTRATOR] About to generate response with {len(results)} results")
             print(f"[ORCHESTRATOR] First result sample: {results[0] if results else 'No results'}")
             
-            response = await self.query_service.generate_response(user_query, sql, results)
+            response = await self.query_service.generate_response(
+                user_query, sql, results
+            )
             print(f"[ORCHESTRATOR] Generated response: {response[:200]}...")
             
-            # 6. Stream completo
+            # 7. Stream completo
             print(f"[ORCHESTRATOR] Starting streaming process")
-            async for chunk in self.streaming_service.stream_query_process(
-                user_query, sql, results, response
-            ):
-                print(f"[ORCHESTRATOR] Yielding chunk: {chunk[:100]}...")
-                yield chunk
-            print(f"[ORCHESTRATOR] Streaming completed")
+            chunk_count = 0
+            try:
+                async for chunk in self.streaming_service.stream_query_process(
+                    user_query, sql, results, response
+                ):
+                    chunk_count += 1
+                    print(f"[ORCHESTRATOR] Yielding chunk {chunk_count}: {chunk[:100]}...")
+                    yield chunk
+                print(f"[ORCHESTRATOR] Streaming completed successfully with {chunk_count} chunks")
+            except Exception as streaming_error:
+                print(f"[ORCHESTRATOR] Streaming error: {str(streaming_error)}")
+                # Yield error message to frontend
+                error_chunk = f"data: {{\"error\": \"Streaming failed: {str(streaming_error)}\"}}\n\n"
+                yield error_chunk
+                yield "data: [DONE]\n\n"
                 
         except Exception as e:
-            async for chunk in self.streaming_service.stream_error(str(e)):
-                yield chunk
+            print(f"[ORCHESTRATOR] Main process error: {str(e)}")
+            try:
+                async for chunk in self.streaming_service.stream_error(str(e)):
+                    yield chunk
+            except Exception as stream_error:
+                print(f"[ORCHESTRATOR] Error streaming error message: {str(stream_error)}")
+                # Fallback error response
+                yield f"data: {{\"error\": \"Process failed: {str(e)}\"}}\n\n"
+                yield "data: [DONE]\n\n"
     
     def _fix_date_extracts(self, sql: str) -> str:
         """Convierte funciones de fecha en campos string a formato válido"""

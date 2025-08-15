@@ -81,6 +81,59 @@ async def process_single_file(
             "error": f"Processing failed: {str(e)}"
         }
 
+async def process_batch_files(
+    files_data: List[Dict[str, Any]], 
+    DynamicSchema: type[BaseModel], 
+    agent: OcrAgent
+) -> Dict[str, Any]:
+    """Process multiple files as pages of a single document."""
+    try:
+        logger.debug(f"Processing batch of {len(files_data)} files")
+        
+        # Combine all file bytes for batch processing
+        combined_text = []
+        filenames = []
+        
+        for file_data in files_data:
+            if file_data["content_type"] not in SUPPORTED_CONTENT_TYPES:
+                continue
+                
+            filenames.append(file_data["filename"])
+            
+            # Extract text from each file
+            initial_state = create_initial_state(file_data["bytes"], DynamicSchema)
+            ocr_state = await agent.graph.nodes["ocr"](initial_state)
+            combined_text.extend(ocr_state["extracted_text"])
+        
+        if not combined_text:
+            return {
+                "files": filenames,
+                "error": "No text extracted from any files"
+            }
+        
+        # Create state with combined text
+        batch_state = {
+            "file": None,
+            "extracted_text": combined_text,
+            "schema": DynamicSchema,
+            "structured": None
+        }
+        
+        # Build schema from combined text
+        final_state = await agent.graph.nodes["build_schema"](batch_state)
+        
+        return {
+            "files": filenames,
+            "structured": final_state["structured"]
+        }
+        
+    except Exception as e:
+        logger.exception("Error processing batch files")
+        return {
+            "files": [f["filename"] for f in files_data],
+            "error": f"Batch processing failed: {str(e)}"
+        }
+
 def build_dynamic_model(schema_dict: Dict) -> type[BaseModel]:
     """Build a dynamic Pydantic model from a schema dictionary."""
     logger.debug("Building dynamic model")
@@ -100,6 +153,7 @@ router = APIRouter()
 async def extract_text(
     files: List[UploadFile] = File(...),
     schema: str = Form(...),
+    batch_mode: bool = Form(False),
     current_user:User=Depends(get_current_user)
 ) -> StreamingResponse:
     """
@@ -108,6 +162,7 @@ async def extract_text(
     Args:
         files: List of uploaded files for OCR processing
         schema: JSON string defining the expected output schema
+        batch_mode: If True, combine all files as pages of one document
         
     Returns:
         StreamingResponse: NDJSON stream of processing results
@@ -165,12 +220,6 @@ async def extract_text(
     # Create agent instance (consider making this a singleton)
     agent = OcrAgent()
     
-    # Process files concurrently
-    tasks = [
-        process_single_file(file, DynamicSchema, agent)
-        for file in file_data
-    ]
-
     # Stream results as they complete
     async def stream_results():
         # First yield any file reading errors
@@ -179,20 +228,32 @@ async def extract_text(
             
         # Then process the files that were read successfully
         if file_data:
-            tasks = [
-                process_single_file(file, DynamicSchema, agent)
-                for file in file_data
-            ]
-            
-            for future in as_completed(tasks):
+            if batch_mode:
+                # Process all files as one document
                 try:
-                    result = await future
+                    result = await process_batch_files(file_data, DynamicSchema, agent)
                     yield json.dumps(result) + "\n"
                 except Exception as e:
-                    logger.exception("Unexpected error in result streaming")
+                    logger.exception("Error in batch processing")
                     yield json.dumps({
-                        "error": f"Unexpected error: {str(e)}"
+                        "error": f"Batch processing failed: {str(e)}"
                     }) + "\n"
+            else:
+                # Process files individually
+                tasks = [
+                    process_single_file(file, DynamicSchema, agent)
+                    for file in file_data
+                ]
+                
+                for future in as_completed(tasks):
+                    try:
+                        result = await future
+                        yield json.dumps(result) + "\n"
+                    except Exception as e:
+                        logger.exception("Unexpected error in result streaming")
+                        yield json.dumps({
+                            "error": f"Unexpected error: {str(e)}"
+                        }) + "\n"
 
     # Create and return the streaming response
     return StreamingResponse(

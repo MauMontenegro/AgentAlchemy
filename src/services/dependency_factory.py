@@ -8,6 +8,7 @@ from .schema_service import SchemaFactory
 from .streaming_service import StreamingService
 from .finance_orchestrator import FinanceQueryOrchestrator
 from .intent_service import IntentAnalysisService
+from .business_rules_service import BusinessRulesService
 from .bquery_db import BigQueryConfig
 
 
@@ -31,13 +32,15 @@ class DependencyFactory:
         schema_service = SchemaFactory.create_schema_service("multi_table")
         streaming_service = StreamingService(chunk_size=20)
         intent_service = IntentAnalysisService(llm_client)
+        business_rules_service = BusinessRulesService()
         
         # Crear orquestador
         return FinanceQueryOrchestrator(
             query_service=query_service,
             schema_service=schema_service,
             streaming_service=streaming_service,
-            intent_service=intent_service
+            intent_service=intent_service,
+            business_rules_service=business_rules_service
         )
     
     @staticmethod

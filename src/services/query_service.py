@@ -10,7 +10,7 @@ class QueryService(ABC):
     """Abstracción para servicios de consulta - DIP"""
     
     @abstractmethod
-    async def generate_sql(self, query: str, schemas: Dict[str, List[Dict]], relationships: Dict = None) -> str:
+    async def generate_sql(self, query: str, schemas: Dict[str, List[Dict]], relationships: Dict = None, business_context: str = None) -> str:
         pass
     
     @abstractmethod
@@ -18,7 +18,7 @@ class QueryService(ABC):
         pass
     
     @abstractmethod
-    async def generate_response(self, query: str, sql: str, results: List[Dict]) -> str:
+    async def generate_response(self, query: str, sql: str, results: List[Dict], additional_context: str = None) -> str:
         pass
 
 
@@ -29,7 +29,7 @@ class BigQueryService(QueryService):
         self.bq_client = bq_client
         self.llm_client = llm_client
     
-    async def generate_sql(self, query: str, schemas: Dict[str, List[Dict]], relationships: Dict = None) -> str:
+    async def generate_sql(self, query: str, schemas: Dict[str, List[Dict]], relationships: Dict = None, business_context: str = None) -> str:
         from datetime import datetime
         print(f"[SQL GENERATION] Starting SQL generation for query: {query}")
         print(f"[SQL GENERATION] Using tables: {list(schemas.keys())}")
@@ -39,7 +39,8 @@ class BigQueryService(QueryService):
             query=query, 
             esquemas=self._format_schemas_for_prompt(schemas),
             relaciones=self._format_relationships_for_prompt(relationships or {}),
-            fecha=datetime.now().strftime("%Y-%m-%d")
+            fecha=datetime.now().strftime("%Y-%m-%d"),
+            business_context=business_context or ""
         )
         
         print(f"[SQL GENERATION] Prompt length: {len(prompt)} characters")
@@ -134,6 +135,9 @@ class BigQueryService(QueryService):
         - Para Vis_Ventas usa: `sipp-app.Tableros.Vis_Ventas`
         - Usa aliases: v, c, i respectivamente
         - VALIDA que cada campo usado existe en el esquema correspondiente
+
+        CONTEXTO DE REGLAS DE NEGOCIO:
+        {business_context}
 
         Pregunta del usuario: {query}
         

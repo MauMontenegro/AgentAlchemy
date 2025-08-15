@@ -30,6 +30,10 @@ passlib = { version = ">=1.7.4,<2.0.0", extras = ["bcrypt"] }
 python-multipart = ">=0.0.20,<0.0.21"
 google-cloud-bigquery = ">=3.35.1,<4.0.0"
 pydantic-settings = ">=2.0.0,<3.0.0"
+pypdf2 = "^3.0.1"
+pdf2image = "^1.17.0"
+pillow = "^11.3.0"
+pymupdf = "^1.26.3"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
