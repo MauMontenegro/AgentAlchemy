@@ -178,7 +178,7 @@ async def extract_text(
             raise ValueError("Schema must be a JSON object")
     except (json.JSONDecodeError, ValueError) as e:
         return StreamingResponse(
-            iter([json.dumps({"error": f"Invalid schema: {str(e)}"}, ensure_ascii=False) + "\n"]),
+            iter([safe_json_dumps({"error": f"Invalid schema: {str(e)}"}) + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -190,7 +190,7 @@ async def extract_text(
     except Exception as e:
         logger.exception("Failed to create dynamic model from schema")
         return StreamingResponse(
-            iter([json.dumps({"error": f"Invalid schema format: {str(e)}"}, ensure_ascii=False) + "\n"]),
+            iter([safe_json_dumps({"error": f"Invalid schema format: {str(e)}"}) + "\n"]),
             media_type="application/x-ndjson"
         )
 
@@ -220,11 +220,19 @@ async def extract_text(
     # Create agent instance (consider making this a singleton)
     agent = OcrAgent()
     
+    def safe_json_dumps(obj):
+        """Safely serialize object to JSON string."""
+        try:
+            return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
+        except (TypeError, ValueError) as e:
+            logger.error(f"JSON serialization error: {e}")
+            return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=False)
+
     # Stream results as they complete
     async def stream_results():
         # First yield any file reading errors
         for error in error_responses:
-            yield json.dumps(error, ensure_ascii=False) + "\n"
+            yield safe_json_dumps(error) + "\n"
             
         # Then process the files that were read successfully
         if file_data:
@@ -232,12 +240,12 @@ async def extract_text(
                 # Process all files as one document
                 try:
                     result = await process_batch_files(file_data, DynamicSchema, agent)
-                    yield json.dumps(result, ensure_ascii=False) + "\n"
+                    yield safe_json_dumps(result) + "\n"
                 except Exception as e:
                     logger.exception("Error in batch processing")
-                    yield json.dumps({
+                    yield safe_json_dumps({
                         "error": f"Batch processing failed: {str(e)}"
-                    }, ensure_ascii=False) + "\n"
+                    }) + "\n"
             else:
                 # Process files individually
                 tasks = [
@@ -248,12 +256,12 @@ async def extract_text(
                 for future in as_completed(tasks):
                     try:
                         result = await future
-                        yield json.dumps(result, ensure_ascii=False) + "\n"
+                        yield safe_json_dumps(result) + "\n"
                     except Exception as e:
                         logger.exception("Unexpected error in result streaming")
-                        yield json.dumps({
+                        yield safe_json_dumps({
                             "error": f"Unexpected error: {str(e)}"
-                        }, ensure_ascii=False) + "\n"
+                        }) + "\n"
 
     # Create and return the streaming response
     return StreamingResponse(

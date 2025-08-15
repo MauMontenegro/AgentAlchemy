@@ -42,7 +42,7 @@ def build_pydantic_schema(state:OcrAgentState)->OcrAgentState:
         load_dotenv()
         parser = JsonOutputParser(pydantic_object=state["schema"])
         prompt = PromptTemplate(
-            template="Extract the following information from the text: {text}\n{format_instructions}",
+            template="Extract the following information from the text: {text}\n{format_instructions}\nIMPORTANT: Return only valid JSON with double-quoted property names.",
             input_variables=["text"],
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
@@ -53,4 +53,5 @@ def build_pydantic_schema(state:OcrAgentState)->OcrAgentState:
         return state
     except Exception as e:
         logger.error(f"Error in Pydantic schema step: {e}")
-        raise e      
+        state["structured"] = {"error": f"Schema parsing failed: {str(e)}"}
+        return state      
